@@ -21,82 +21,135 @@
  * into a test file or another script to execute `runErrorHandlingDemo()`.
  * e.g., `node -e "import('./core/workflow/examples/resilientTaskExample.js').then(m => m.runErrorHandlingDemo().catch(console.error))"`
  */
-import { Runnable } from '../../runnable2/runnable.js';
-import {RunnableError} from "../../runnable2/runnableError.js";
-import {RunnableLambda} from "../../runnable2/runnableLambda.js"; // Adjusted imports
+import { Runnable } from "../../runnable2/runnable.js";
+import { RunnableError } from "../../runnable2/runnableError.js";
+import { RunnableLambda } from "../../runnable2/runnableLambda.js"; // Adjusted imports
 
 // --- Mock service call functions ---
 /** Simulates a primary service that can fail. */
 async function primaryServiceCall(input, attempt) {
-  console.log(`[ExampleService] Attempting primary service with input: ${JSON.stringify(input)}, attempt: ${attempt}`);
-  // Simulate failure on first attempt for "good_input_retry"
-  if (input.id === "good_input_retry" && attempt < 2) {
-    const error = new Error("Primary service failed temporarily (simulated 500 error)");
-    error.status = 500;
-    console.warn(`[ExampleService] Primary service simulating 500 error for input "${input.id}" on attempt ${attempt}`);
-    throw error;
-  }
-  // Simulate permanent failure for "bad_input_primary"
-  if (input.id === "bad_input_primary") {
-    const error = new Error("Primary service permanent error (simulated 400 error)");
-    error.status = 400;
-    console.warn(`[ExampleService] Primary service simulating 400 error for input "${input.id}"`);
-    throw error;
-  }
-  console.log(`[ExampleService] Primary service success for input "${input.id}" on attempt ${attempt}`);
-  return { data: `Primary service success for '${input.id}' on attempt ${attempt}`, source: 'primary' };
+	console.log(
+		`[ExampleService] Attempting primary service with input: ${JSON.stringify(input)}, attempt: ${attempt}`,
+	);
+	// Simulate failure on first attempt for "good_input_retry"
+	if (input.id === "good_input_retry" && attempt < 2) {
+		const error = new Error(
+			"Primary service failed temporarily (simulated 500 error)",
+		);
+		error.status = 500;
+		console.warn(
+			`[ExampleService] Primary service simulating 500 error for input "${input.id}" on attempt ${attempt}`,
+		);
+		throw error;
+	}
+	// Simulate permanent failure for "bad_input_primary"
+	if (input.id === "bad_input_primary") {
+		const error = new Error(
+			"Primary service permanent error (simulated 400 error)",
+		);
+		error.status = 400;
+		console.warn(
+			`[ExampleService] Primary service simulating 400 error for input "${input.id}"`,
+		);
+		throw error;
+	}
+	console.log(
+		`[ExampleService] Primary service success for input "${input.id}" on attempt ${attempt}`,
+	);
+	return {
+		data: `Primary service success for '${input.id}' on attempt ${attempt}`,
+		source: "primary",
+	};
 }
 
 async function fallbackServiceCall(input) {
-  console.log(`[ExampleService] Attempting fallback service with input: ${JSON.stringify(input)}`);
-  // Simulate failure for "bad_input_fallback"
-  if (input.id === "bad_input_fallback") {
-    console.warn(`[ExampleService] Fallback service simulating failure for input "${input.id}"`);
-    throw new Error("Fallback service failed (simulated)");
-  }
-  console.log(`[ExampleService] Fallback service success for input "${input.id}"`);
-  return { data: `Fallback service success for '${input.id}'`, source: 'fallback_1' };
+	console.log(
+		`[ExampleService] Attempting fallback service with input: ${JSON.stringify(input)}`,
+	);
+	// Simulate failure for "bad_input_fallback"
+	if (input.id === "bad_input_fallback") {
+		console.warn(
+			`[ExampleService] Fallback service simulating failure for input "${input.id}"`,
+		);
+		throw new Error("Fallback service failed (simulated)");
+	}
+	console.log(
+		`[ExampleService] Fallback service success for input "${input.id}"`,
+	);
+	return {
+		data: `Fallback service success for '${input.id}'`,
+		source: "fallback_1",
+	};
 }
 
 async function criticalFallbackServiceCall(input) {
-  console.log(`[ExampleService] Attempting CRITICAL fallback service with input: ${JSON.stringify(input)}`);
-  console.log(`[ExampleService] CRITICAL fallback service success for input "${input.id}"`);
-  return { data: `CRITICAL Fallback service success for '${input.id}' - data might be partial`, source: 'fallback_critical' };
+	console.log(
+		`[ExampleService] Attempting CRITICAL fallback service with input: ${JSON.stringify(input)}`,
+	);
+	console.log(
+		`[ExampleService] CRITICAL fallback service success for input "${input.id}"`,
+	);
+	return {
+		data: `CRITICAL Fallback service success for '${input.id}' - data might be partial`,
+		source: "fallback_critical",
+	};
 }
 
 // --- Create Runnable for Primary Service ---
 class PrimaryServiceRunnable extends Runnable {
-  constructor(options = {}) { // Added options parameter
-    super(options); // Pass options to base
-    this.attempts = 0;
-    this.name = options.name || "PrimaryServiceTask"; // Use name from options or default
-  }
+	constructor(options = {}) {
+		// Added options parameter
+		super(options); // Pass options to base
+		this.attempts = 0;
+		this.name = options.name || "PrimaryServiceTask"; // Use name from options or default
+	}
 
-  // This invoke returns a Promise, not an async generator, as `withRetry` expects.
-  async invoke(input, workflowContext) {
-    this._currentWorkflowContext = workflowContext; // Set context for this.log/this.error
-    this.attempts++;
+	// This invoke returns a Promise, not an async generator, as `withRetry` expects.
+	async invoke(input, workflowContext) {
+		this._currentWorkflowContext = workflowContext; // Set context for this.log/this.error
+		this.attempts++;
 
-    // Using `yield this._createLogEvent` is for async* generators.
-    // Here, we use the old direct emit or console.log for simplicity as this Runnable
-    // is not yet updated to the async* pattern.
-    // For consistency with the latest Runnable pattern, this should be an async* generator.
-    // However, `withRetry` and `withFallbacks` are not yet refactored to consume async* generators.
-    // So, we keep this as Promise-returning for now.
-    console.log(formatLogMessages(this._createLogEvent('info', `Invoking for input: ${JSON.stringify(input)}, current instance attempt: ${this.attempts}. Context: ${JSON.stringify(workflowContext)}`)));
+		// Using `yield this._createLogEvent` is for async* generators.
+		// Here, we use the old direct emit or console.log for simplicity as this Runnable
+		// is not yet updated to the async* pattern.
+		// For consistency with the latest Runnable pattern, this should be an async* generator.
+		// However, `withRetry` and `withFallbacks` are not yet refactored to consume async* generators.
+		// So, we keep this as Promise-returning for now.
+		console.log(
+			formatLogMessages(
+				this._createLogEvent(
+					"info",
+					`Invoking for input: ${JSON.stringify(input)}, current instance attempt: ${this.attempts}. Context: ${JSON.stringify(workflowContext)}`,
+				),
+			),
+		);
 
-
-    try {
-      const result = await primaryServiceCall(input, this.attempts);
-      console.log(formatLogMessages(this._createLogEvent('info', `Succeeded for: ${JSON.stringify(input)}`)));
-      return result;
-    } catch (err) {
-      console.error(formatLogMessages(this._createLogEvent('error', `Failed for: ${JSON.stringify(input)} with error: ${err.message}. Status: ${err.status}`, err)));
-      throw err;
-    } finally {
-        this._currentWorkflowContext = null;
-    }
-  }
+		try {
+			const result = await primaryServiceCall(input, this.attempts);
+			console.log(
+				formatLogMessages(
+					this._createLogEvent(
+						"info",
+						`Succeeded for: ${JSON.stringify(input)}`,
+					),
+				),
+			);
+			return result;
+		} catch (err) {
+			console.error(
+				formatLogMessages(
+					this._createLogEvent(
+						"error",
+						`Failed for: ${JSON.stringify(input)} with error: ${err.message}. Status: ${err.status}`,
+						err,
+					),
+				),
+			);
+			throw err;
+		} finally {
+			this._currentWorkflowContext = null;
+		}
+	}
 }
 
 // --- Define the Resilient Task ---
@@ -106,50 +159,66 @@ class PrimaryServiceRunnable extends Runnable {
  * @returns {Runnable} The composed resilient runnable.
  */
 export function createResilientTaskRunnable() {
-  // Important: For stateful Runnables like PrimaryServiceRunnable (with its own attempt counter),
-  // ensure a new instance is created if you need fresh state for each top-level invoke,
-  // or design them to be reset or to take attempt information from context if retry is external.
-  // Here, `withRetry` will re-invoke `primaryTask.invoke`, so `primaryTask` instance is reused across retries.
-  const primaryTask = new PrimaryServiceRunnable();
+	// Important: For stateful Runnables like PrimaryServiceRunnable (with its own attempt counter),
+	// ensure a new instance is created if you need fresh state for each top-level invoke,
+	// or design them to be reset or to take attempt information from context if retry is external.
+	// Here, `withRetry` will re-invoke `primaryTask.invoke`, so `primaryTask` instance is reused across retries.
+	const primaryTask = new PrimaryServiceRunnable();
 
-  const resilientPrimaryTask = primaryTask.withRetry({
-    times: 3, // Max 3 attempts for primaryTask (1st try + 2 retries)
-    interval: (retryCount) => { // retryCount is 1 for the first retry, 2 for the second, etc.
-      const delay = retryCount * 100;
-      console.log(`[RetryLogic] Delaying retry by ${delay}ms for attempt number ${retryCount + 1}`);
-      return delay;
-    },
-    errorFilter: (err) => {
-      console.log(`[RetryFilter] Evaluating error: "${err.message}" (status: ${err.status})`);
-      // Only retry on simulated server errors (5xx)
-      if (err.status === 500) {
-        console.log('[RetryFilter] Approved retry for 500 error.');
-        return true;
-      }
-      console.log('[RetryFilter] Rejected retry for non-500 error.');
-      return false;
-    },
-  });
+	const resilientPrimaryTask = primaryTask.withRetry({
+		times: 3, // Max 3 attempts for primaryTask (1st try + 2 retries)
+		interval: (retryCount) => {
+			// retryCount is 1 for the first retry, 2 for the second, etc.
+			const delay = retryCount * 100;
+			console.log(
+				`[RetryLogic] Delaying retry by ${delay}ms for attempt number ${retryCount + 1}`,
+			);
+			return delay;
+		},
+		errorFilter: (err) => {
+			console.log(
+				`[RetryFilter] Evaluating error: "${err.message}" (status: ${err.status})`,
+			);
+			// Only retry on simulated server errors (5xx)
+			if (err.status === 500) {
+				console.log("[RetryFilter] Approved retry for 500 error.");
+				return true;
+			}
+			console.log("[RetryFilter] Rejected retry for non-500 error.");
+			return false;
+		},
+	});
 
-  // Fallback Runnables also use Promise-returning invoke for compatibility with current withFallbacks
-  const fallbackTask = new RunnableLambda(async (input, workflowContext) => {
-    // This lambda's this._currentWorkflowContext will be set by its own invoke wrapper
-    // if it were an async* gen. For now, console.log directly.
-    // It should ideally also use _createLogEvent and yield.
-    const runnable = fallbackTask; // self-reference for name
-    console.log(`[${runnable.name}] Fallback 1 Invoked. Input:`, JSON.stringify(input));
-    return fallbackServiceCall(input);
-  }, { name: "FallbackServiceTask_1" });
+	// Fallback Runnables also use Promise-returning invoke for compatibility with current withFallbacks
+	const fallbackTask = new RunnableLambda(
+		async (input, workflowContext) => {
+			// This lambda's this._currentWorkflowContext will be set by its own invoke wrapper
+			// if it were an async* gen. For now, console.log directly.
+			// It should ideally also use _createLogEvent and yield.
+			const runnable = fallbackTask; // self-reference for name
+			console.log(
+				`[${runnable.name}] Fallback 1 Invoked. Input:`,
+				JSON.stringify(input),
+			);
+			return fallbackServiceCall(input);
+		},
+		{ name: "FallbackServiceTask_1" },
+	);
 
+	const criticalFallbackTask = new RunnableLambda(
+		async (input, workflowContext) => {
+			const runnable = criticalFallbackTask;
+			console.log(
+				`[${runnable.name}] Critical Fallback Invoked. Input:`,
+				JSON.stringify(input),
+			);
+			return criticalFallbackServiceCall(input);
+		},
+		{ name: "CriticalFallbackServiceTask" },
+	);
 
-  const criticalFallbackTask = new RunnableLambda(async (input, workflowContext) => {
-    const runnable = criticalFallbackTask;
-    console.log(`[${runnable.name}] Critical Fallback Invoked. Input:`, JSON.stringify(input));
-    return criticalFallbackServiceCall(input);
-  }, { name: "CriticalFallbackServiceTask" });
-
-  // Compose with fallbacks. Note: withFallbacks expects an array of runnables.
-  return resilientPrimaryTask.withFallbacks(fallbackTask, criticalFallbackTask);
+	// Compose with fallbacks. Note: withFallbacks expects an array of runnables.
+	return resilientPrimaryTask.withFallbacks(fallbackTask, criticalFallbackTask);
 }
 
 // --- Main Demo Function ---
@@ -157,47 +226,68 @@ export function createResilientTaskRunnable() {
  * Runs a demonstration of the resilient task, showcasing retry and fallback behaviors.
  */
 export async function runErrorHandlingDemo() {
-  console.log("--- Starting Resilient Task Demo ---");
+	console.log("--- Starting Resilient Task Demo ---");
 
-  // Create a new resilient task instance for each scenario or ensure statelessness if reused.
-  // const resilientTask = createResilientTaskRunnable();
-  // resilientTask.name = "MyResilientTaskWithFallbacks"; // Name can be set on instance
+	// Create a new resilient task instance for each scenario or ensure statelessness if reused.
+	// const resilientTask = createResilientTaskRunnable();
+	// resilientTask.name = "MyResilientTaskWithFallbacks"; // Name can be set on instance
 
-  // Minimal context for this example, as it doesn't use WorkflowService here.
-  const exampleContext = {
-    traceId: `trace-resilient-${Date.now()}`,
-    // serviceRegistry: new ServiceRegistry(), // If any deeper runnables needed it
-  };
+	// Minimal context for this example, as it doesn't use WorkflowService here.
+	const exampleContext = {
+		traceId: `trace-resilient-${Date.now()}`,
+		// serviceRegistry: new ServiceRegistry(), // If any deeper runnables needed it
+	};
 
-  const testCases = [
-    { id: "good_input_retry", description: "Successful after one retry on primary" },
-    { id: "bad_input_primary", description: "Non-retriable error on primary, success on first fallback" },
-    { id: "bad_input_fallback", description: "Primary fails (non-retriable), first fallback fails, success on critical fallback" },
-    { id: "direct_success", description: "Direct success on primary, no retries/fallbacks" },
-  ];
+	const testCases = [
+		{
+			id: "good_input_retry",
+			description: "Successful after one retry on primary",
+		},
+		{
+			id: "bad_input_primary",
+			description: "Non-retriable error on primary, success on first fallback",
+		},
+		{
+			id: "bad_input_fallback",
+			description:
+				"Primary fails (non-retriable), first fallback fails, success on critical fallback",
+		},
+		{
+			id: "direct_success",
+			description: "Direct success on primary, no retries/fallbacks",
+		},
+	];
 
-  for (const testCase of testCases) {
-    console.log(`\n--- Testing Case: ${testCase.description} (Input ID: ${testCase.id}) ---`);
-    // For stateful runnables like PrimaryServiceRunnable, if you want a fresh state for each test case,
-    // you should ideally recreate the `resilientTask` or ensure the runnable's state is reset.
-    // `createResilientTaskRunnable()` creates new instances, so this is fine.
-     const taskForTestCase = createResilientTaskRunnable();
-     taskForTestCase.name = `ResilientTaskFor_${testCase.id}`;
+	for (const testCase of testCases) {
+		console.log(
+			`\n--- Testing Case: ${testCase.description} (Input ID: ${testCase.id}) ---`,
+		);
+		// For stateful runnables like PrimaryServiceRunnable, if you want a fresh state for each test case,
+		// you should ideally recreate the `resilientTask` or ensure the runnable's state is reset.
+		// `createResilientTaskRunnable()` creates new instances, so this is fine.
+		const taskForTestCase = createResilientTaskRunnable();
+		taskForTestCase.name = `ResilientTaskFor_${testCase.id}`;
 
-    try {
-      // Reset attempts for the specific PrimaryServiceRunnable instance if it's being reused.
-      // However, createResilientTaskRunnable() creates a new PrimaryServiceRunnable instance each time.
-      // If PrimaryServiceRunnable's 'attempts' was meant to track across retries of a single call,
-      // the withRetry mechanism handles that by re-calling invoke on the *same* instance.
-      // The internal `this.attempts` in PrimaryServiceRunnable will thus correctly track attempts for a single `invoke` sequence (including retries).
+		try {
+			// Reset attempts for the specific PrimaryServiceRunnable instance if it's being reused.
+			// However, createResilientTaskRunnable() creates a new PrimaryServiceRunnable instance each time.
+			// If PrimaryServiceRunnable's 'attempts' was meant to track across retries of a single call,
+			// the withRetry mechanism handles that by re-calling invoke on the *same* instance.
+			// The internal `this.attempts` in PrimaryServiceRunnable will thus correctly track attempts for a single `invoke` sequence (including retries).
 
-      const result = await taskForTestCase.invoke({ id: testCase.id }, context);
-      console.log(`SUCCESS Case "${testCase.description}":`, JSON.stringify(result, null, 2));
-    } catch (e) {
-      console.error(`FAILURE Case "${testCase.description}": ${e.message}. Full Error:`, e);
-    }
-  }
-  console.log("\nError handling demo finished.");
+			const result = await taskForTestCase.invoke({ id: testCase.id }, context);
+			console.log(
+				`SUCCESS Case "${testCase.description}":`,
+				JSON.stringify(result, null, 2),
+			);
+		} catch (e) {
+			console.error(
+				`FAILURE Case "${testCase.description}": ${e.message}. Full Error:`,
+				e,
+			);
+		}
+	}
+	console.log("\nError handling demo finished.");
 }
 
 // To run this example, you might import and call runErrorHandlingDemo() from another file,

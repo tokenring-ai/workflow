@@ -7,60 +7,75 @@ import { Runnable } from "../../../../runnable/runnable.js";
  * JSON Schema for task decomposition response, compatible with OpenAI function calling
  */
 const decompositionSchema = {
- type: "object",
- properties: {
-  subtasks: {
-   type: "array",
-   items: {
-    type: "object",
-    properties: {
-     description: {
-      type: "string",
-      description: "A clear description of the task starting with a verb"
-     },
-     rationale: {
-      type: "string",
-      description: "A brief rationale explaining why this subtask is necessary"
-     },
-     explanation: {
-      type: "string",
-      description: "A detailed explanation defining how this subtask should be accomplished"
-     },
-     requiresFurtherDecomposition: {
-      type: "boolean",
-      description: "Indicates whether AI should further decompose this subtask, or whether the task is fully defined and executable by AI without needing more information"
-     },
-     subtaskType: {
-      type: "string",
-      enum: ["planning", "execution", "research"],
-      description: "The nature of the subtask (planning, execution, or research). Execution tasks are typically more concrete and tool-oriented."
-     },
-     id: {
-      type: "string",
-      description: "Unique identifier for this subtask (e.g., task-1, task-2) within the current decomposition."
-     },
-     dependsOn: {
-      type: "array",
-      items: { type: "string" },
-      description: "An array of IDs of subtasks from the current decomposition pass that must be completed before this one can start. Optional."
-     },
-     isCritical: {
-      type: "boolean",
-      default: false,
-      description: "Indicates if the failure of this subtask should be considered critical, potentially halting further non-dependent execution. Default to false."
-     }
-    },
-    required: ["description", "rationale", "explanation", "requiresFurtherDecomposition", "subtaskType", "id"], // isCritical is optional due to default
-    additionalProperties: false
-   }
-  },
-  reasoning: {
-   type: "string",
-   description: "Explanation of what you are doing, and what you focused on in the decomposition process"
-  }
- },
- required: ["subtasks", "reasoning"],
- additionalProperties: false
+	type: "object",
+	properties: {
+		subtasks: {
+			type: "array",
+			items: {
+				type: "object",
+				properties: {
+					description: {
+						type: "string",
+						description: "A clear description of the task starting with a verb",
+					},
+					rationale: {
+						type: "string",
+						description:
+							"A brief rationale explaining why this subtask is necessary",
+					},
+					explanation: {
+						type: "string",
+						description:
+							"A detailed explanation defining how this subtask should be accomplished",
+					},
+					requiresFurtherDecomposition: {
+						type: "boolean",
+						description:
+							"Indicates whether AI should further decompose this subtask, or whether the task is fully defined and executable by AI without needing more information",
+					},
+					subtaskType: {
+						type: "string",
+						enum: ["planning", "execution", "research"],
+						description:
+							"The nature of the subtask (planning, execution, or research). Execution tasks are typically more concrete and tool-oriented.",
+					},
+					id: {
+						type: "string",
+						description:
+							"Unique identifier for this subtask (e.g., task-1, task-2) within the current decomposition.",
+					},
+					dependsOn: {
+						type: "array",
+						items: { type: "string" },
+						description:
+							"An array of IDs of subtasks from the current decomposition pass that must be completed before this one can start. Optional.",
+					},
+					isCritical: {
+						type: "boolean",
+						default: false,
+						description:
+							"Indicates if the failure of this subtask should be considered critical, potentially halting further non-dependent execution. Default to false.",
+					},
+				},
+				required: [
+					"description",
+					"rationale",
+					"explanation",
+					"requiresFurtherDecomposition",
+					"subtaskType",
+					"id",
+				], // isCritical is optional due to default
+				additionalProperties: false,
+			},
+		},
+		reasoning: {
+			type: "string",
+			description:
+				"Explanation of what you are doing, and what you focused on in the decomposition process",
+		},
+	},
+	required: ["subtasks", "reasoning"],
+	additionalProperties: false,
 };
 
 /**
@@ -70,16 +85,18 @@ const decompositionSchema = {
  * @returns {Promise<Object>} - The decomposed task with subtasks
  */
 async function decomposeTask(workflowContext, registry) {
-  const modelRegistry = registry.requireFirstServiceByType(ModelRegistry);
-  const chatService = registry.requireFirstServiceByType(ChatService);
+	const modelRegistry = registry.requireFirstServiceByType(ModelRegistry);
+	const chatService = registry.requireFirstServiceByType(ChatService);
 
-  const request = workflowContext.sharedData.discovery; // Get request from context
-  const breadth = workflowContext.options.breadth || 5; // Get breadth from context options
+	const request = workflowContext.sharedData.discovery; // Get request from context
+	const breadth = workflowContext.options.breadth || 5; // Get breadth from context options
 
-  return await flow('task-decomposition', async () => {
-    chatService.systemLine("[TaskDecomposer] Decomposing task into logical subtasks...");
+	return await flow("task-decomposition", async () => {
+		chatService.systemLine(
+			"[TaskDecomposer] Decomposing task into logical subtasks...",
+		);
 
-    const prompt = `You are a task decomposer. Your job is to analyze the chat stream above, decompose the task into logical subtasks, and provide a detailed explanation of the decomposition approach and the tasks that you have decomposed the task into.
+		const prompt = `You are a task decomposer. Your job is to analyze the chat stream above, decompose the task into logical subtasks, and provide a detailed explanation of the decomposition approach and the tasks that you have decomposed the task into.
 - Decompose the task into up to ${breadth} **logical subtasks**.
 - For each subtask:
     - Assign a unique \`id\` (e.g., "task-1", "task-2", ...).
@@ -96,37 +113,53 @@ async function decomposeTask(workflowContext, registry) {
 - Maintain clarity. Each description should begin with a **verb** (e.g., "Define", "Outline", "Identify", "Specify", "Determine").
 `;
 
-  const client = await modelRegistry.getFirstOnlineClient({
-   tags: ['analyze', 'reasoning']
-  });
+		const client = await modelRegistry.getFirstOnlineClient({
+			tags: ["analyze", "reasoning"],
+		});
 
+		const newMessages = [
+			...request.messages,
+			{ role: "user", content: prompt },
+		];
 
-  const newMessages = [...request.messages, { role: 'user', content: prompt } ];
+		// Generate object using schema
+		const [decomposition] = await client.generateObject(
+			{
+				...request,
+				messages: newMessages,
+				schema: decompositionSchema,
+				temperature: 0.2,
+			},
+			registry,
+		);
 
-  // Generate object using schema
-  const [decomposition] = await client.generateObject( {
-   ...request,
-   messages: newMessages,
-   schema: decompositionSchema,
-   temperature: 0.2
-  }, registry);
+		chatService.systemLine(
+			`[TaskDecomposer] Task decomposed into ${decomposition.subtasks.length} subtasks`,
+		);
 
-  chatService.systemLine(`[TaskDecomposer] Task decomposed into ${decomposition.subtasks.length} subtasks`);
-
-  // Add the decomposition to the request
-  return {
-   request,
-   decomposition
-  };
- });
+		// Add the decomposition to the request
+		return {
+			request,
+			decomposition,
+		};
+	});
 }
 
 export default class DecomposeRunnable extends Runnable {
-  async *invoke(context, { serviceRegistry }) {
-    const wfCtx = { sharedData: { discovery: context.request }, options: { breadth: context.options?.breadth || 5 } };
-    const plan = await decomposeTask(wfCtx, serviceRegistry);
-    context.plan = plan;
-    yield { type: 'log', level: 'info', message: 'Decomposition complete', timestamp: Date.now(), runnableName: this.name };
-    return context;
-  }
+	async *invoke(context, { serviceRegistry }) {
+		const wfCtx = {
+			sharedData: { discovery: context.request },
+			options: { breadth: context.options?.breadth || 5 },
+		};
+		const plan = await decomposeTask(wfCtx, serviceRegistry);
+		context.plan = plan;
+		yield {
+			type: "log",
+			level: "info",
+			message: "Decomposition complete",
+			timestamp: Date.now(),
+			runnableName: this.name,
+		};
+		return context;
+	}
 }

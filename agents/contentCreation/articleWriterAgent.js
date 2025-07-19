@@ -1,9 +1,10 @@
-import ModelRegistry from '@token-ring/ai-client/ModelRegistry';
-import ChatService from '@token-ring/chat/ChatService';         // Adjust if your path is different
+import ModelRegistry from "@token-ring/ai-client/ModelRegistry";
+import ChatService from "@token-ring/chat/ChatService"; // Adjust if your path is different
 
 // No Zod schema for output as it's a simple object with a string.
 
-const systemPrompt = "You are a writer. Your task is to write an article. Adhere to any specified constraints and incorporate any feedback provided on previous versions. Be clear and concise.";
+const systemPrompt =
+	"You are a writer. Your task is to write an article. Adhere to any specified constraints and incorporate any feedback provided on previous versions. Be clear and concise.";
 
 /**
  * Agent to write or revise an article based on input and feedback.
@@ -19,18 +20,25 @@ const systemPrompt = "You are a writer. Your task is to write an article. Adhere
  * @returns {Promise<{articleText: string}>} - An object containing the generated or revised article text.
  */
 async function process(input, workflowContext, registry, agentConfig = {}) {
-  const chatService = registry.requireFirstServiceByType(ChatService);
-  const modelRegistry = registry.requireFirstServiceByType(ModelRegistry);
+	const chatService = registry.requireFirstServiceByType(ChatService);
+	const modelRegistry = registry.requireFirstServiceByType(ModelRegistry);
 
-  chatService.systemLine('[ArticleWriterAgent] Starting article generation/revision...');
+	chatService.systemLine(
+		"[ArticleWriterAgent] Starting article generation/revision...",
+	);
 
-  let userMessageContent;
-  const topic = input.originalTask?.topic || input.topic || "a general topic";
-  const constraint = input.originalTask?.constraint || input.constraint || "no specific constraint";
+	let userMessageContent;
+	const topic = input.originalTask?.topic || input.topic || "a general topic";
+	const constraint =
+		input.originalTask?.constraint ||
+		input.constraint ||
+		"no specific constraint";
 
-  if (input.previousWork && input.feedback) {
-    chatService.systemLine(`[ArticleWriterAgent] Revising article based on feedback. Topic: ${topic}`);
-    userMessageContent = `Please revise the article based on the following feedback.
+	if (input.previousWork && input.feedback) {
+		chatService.systemLine(
+			`[ArticleWriterAgent] Revising article based on feedback. Topic: ${topic}`,
+		);
+		userMessageContent = `Please revise the article based on the following feedback.
 Original Topic: ${topic}
 Constraint: ${constraint}
 
@@ -44,37 +52,49 @@ Feedback:
 ${input.feedback}
 ---
 Please provide the new, complete article.`;
-  } else {
-    chatService.systemLine(`[ArticleWriterAgent] Writing new article. Topic: ${topic}`);
-    userMessageContent = `Please write an article on the topic: "${topic}".
+	} else {
+		chatService.systemLine(
+			`[ArticleWriterAgent] Writing new article. Topic: ${topic}`,
+		);
+		userMessageContent = `Please write an article on the topic: "${topic}".
 Constraint: ${constraint}`;
-  }
+	}
 
-  if (!userMessageContent) {
-      throw new Error("Could not determine content for article generation (missing topic/constraint or feedback).");
-  }
+	if (!userMessageContent) {
+		throw new Error(
+			"Could not determine content for article generation (missing topic/constraint or feedback).",
+		);
+	}
 
-  const client = await modelRegistry.getFirstOnlineClient({ tags: ['writing', 'content-creation'] });
+	const client = await modelRegistry.getFirstOnlineClient({
+		tags: ["writing", "content-creation"],
+	});
 
-  try {
-    const messages = [{ role: 'user', content: userMessageContent }];
+	try {
+		const messages = [{ role: "user", content: userMessageContent }];
 
-    const generated = await client.generateText({
-      messages,
-      prompt: systemPrompt, // System prompt providing overall instruction
-      temperature: 0.6, // Slightly higher for creative writing
-    }, registry);
+		const generated = await client.generateText(
+			{
+				messages,
+				prompt: systemPrompt, // System prompt providing overall instruction
+				temperature: 0.6, // Slightly higher for creative writing
+			},
+			registry,
+		);
 
-    const articleText = generated.text;
+		const articleText = generated.text;
 
-    chatService.systemLine(`[ArticleWriterAgent] Article processing completed. Text length: ${articleText.length}`);
-    return { articleText };
-
-  } catch (error) {
-    chatService.errorLine(`[ArticleWriterAgent] Error during article generation/revision: ${error.message}`);
-    console.error(error);
-    throw error;
-  }
+		chatService.systemLine(
+			`[ArticleWriterAgent] Article processing completed. Text length: ${articleText.length}`,
+		);
+		return { articleText };
+	} catch (error) {
+		chatService.errorLine(
+			`[ArticleWriterAgent] Error during article generation/revision: ${error.message}`,
+		);
+		console.error(error);
+		throw error;
+	}
 }
 
 export default process;

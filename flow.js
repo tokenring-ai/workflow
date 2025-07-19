@@ -1,5 +1,5 @@
-import { AsyncLocalStorage } from 'node:async_hooks';
-import asyncQueue from 'async-es/queue.js';
+import { AsyncLocalStorage } from "node:async_hooks";
+import asyncQueue from "async-es/queue.js";
 
 const cacheStorage = new AsyncLocalStorage();
 const maxRetries = 3; // Default maxRetries for tasks processed by the root flow's queue.
@@ -11,65 +11,74 @@ const maxRetries = 3; // Default maxRetries for tasks processed by the root flow
  * @returns {Promise<any>} Result of the sub-workflow execution
  */
 export async function flow(taskName, taskFn) {
- const parent = cacheStorage.getStore();
- if (parent == null) {
-  const queue = asyncQueue(async (task, done) => {
-   // This queue is for the root flow instance.
-   // It provides a coarse-grained retry mechanism for tasks (task.fn) submitted to it.
-   // If task.fn internally uses Runnables with their own .withRetry() or .withFallbacks(),
-   // those will be handled first. This queue's retry is a last resort if the task.fn()
-   // itself ultimately throws an error after its internal handling.
-   try {
-    const result = await task.fn();
-    done(null, result);
-   } catch (err) {
-    // The `task.retries` here is the retry count for *this specific queue's processing* of task.fn.
-    // It's distinct from any retries that might happen inside task.fn if it uses Runnables.
-    // `maxRetries` is the limit for this queue's retry attempts.
-    if (task.retries < (task.maxRetriesConfigured || maxRetries)) { // task.maxRetriesConfigured could come from queue() call
-     task.retries++;
-     // TODO: Consider adding a delay here, perhaps configurable or exponential.
-     console.log(`[FlowQueue] Retrying task "${task.label}", attempt ${task.retries + 1}/${(task.maxRetriesConfigured || maxRetries) + 1}`);
-     queue.push(task); // Re-queue the task for another attempt
-    } else {
-     console.error(`❌ [FlowQueue] Task "${task.label}" failed after ${(task.maxRetriesConfigured || maxRetries) +1} attempts:`, err.message);
-     done(err); // Final failure after exhausting this queue's retries
-    }
-   }
-  }, 10); // Concurrency for this root flow's task queue.
+	const parent = cacheStorage.getStore();
+	if (parent == null) {
+		const queue = asyncQueue(async (task, done) => {
+			// This queue is for the root flow instance.
+			// It provides a coarse-grained retry mechanism for tasks (task.fn) submitted to it.
+			// If task.fn internally uses Runnables with their own .withRetry() or .withFallbacks(),
+			// those will be handled first. This queue's retry is a last resort if the task.fn()
+			// itself ultimately throws an error after its internal handling.
+			try {
+				const result = await task.fn();
+				done(null, result);
+			} catch (err) {
+				// The `task.retries` here is the retry count for *this specific queue's processing* of task.fn.
+				// It's distinct from any retries that might happen inside task.fn if it uses Runnables.
+				// `maxRetries` is the limit for this queue's retry attempts.
+				if (task.retries < (task.maxRetriesConfigured || maxRetries)) {
+					// task.maxRetriesConfigured could come from queue() call
+					task.retries++;
+					// TODO: Consider adding a delay here, perhaps configurable or exponential.
+					console.log(
+						`[FlowQueue] Retrying task "${task.label}", attempt ${task.retries + 1}/${(task.maxRetriesConfigured || maxRetries) + 1}`,
+					);
+					queue.push(task); // Re-queue the task for another attempt
+				} else {
+					console.error(
+						`❌ [FlowQueue] Task "${task.label}" failed after ${(task.maxRetriesConfigured || maxRetries) + 1} attempts:`,
+						err.message,
+					);
+					done(err); // Final failure after exhausting this queue's retries
+				}
+			}
+		}, 10); // Concurrency for this root flow's task queue.
 
-  const res = await cacheStorage.run({
-   cache: new Map(),
-   taskPath: '',
-   emit: null,
-   queue
-  }, () => flow(taskName, taskFn));
+		const res = await cacheStorage.run(
+			{
+				cache: new Map(),
+				taskPath: "",
+				emit: null,
+				queue,
+			},
+			() => flow(taskName, taskFn),
+		);
 
-  await queue.drain();
-  return res;
- }
+		await queue.drain();
+		return res;
+	}
 
- const { cache, emit} = parent;
- const taskPath = parent.taskPath + taskName;
+	const { cache, emit } = parent;
+	const taskPath = parent.taskPath + taskName;
 
- if (cache.has(taskPath)) {
-  const cachedResult = cache.get(taskPath);
-  emit?.('taskCacheHit', { taskPath, result: cachedResult });
-  return cachedResult;
- }
+	if (cache.has(taskPath)) {
+		const cachedResult = cache.get(taskPath);
+		emit?.("taskCacheHit", { taskPath, result: cachedResult });
+		return cachedResult;
+	}
 
- emit?.('taskStart', { taskPath });
+	emit?.("taskStart", { taskPath });
 
- try {
-  const result = await cacheStorage.run({ cache, taskPath, emit }, taskFn);
+	try {
+		const result = await cacheStorage.run({ cache, taskPath, emit }, taskFn);
 
-  emit?.('taskSuccess', { taskPath, result });
-  cache.set(taskName, result);
-  return result;
- } catch (error) {
-  emit?.('taskError', { taskPath, error });
-  throw error;
- }
+		emit?.("taskSuccess", { taskPath, result });
+		cache.set(taskName, result);
+		return result;
+	} catch (error) {
+		emit?.("taskError", { taskPath, error });
+		throw error;
+	}
 }
 
 /**
@@ -80,12 +89,12 @@ export async function flow(taskName, taskFn) {
  * @returns {Promise<any[]>} Array of results from the parallel executions
  */
 export async function parallel(name, count, producer) {
- const flows = [];
- for (let i = 0; i < count; i++) {
-  flows.push(flow(`${name} [${i}/${count}]`, () => producer(i)));
- }
+	const flows = [];
+	for (let i = 0; i < count; i++) {
+		flows.push(flow(`${name} [${i}/${count}]`, () => producer(i)));
+	}
 
- return Promise.all(flows);
+	return Promise.all(flows);
 }
 
 /**
@@ -95,7 +104,11 @@ export async function parallel(name, count, producer) {
  * @returns {Promise<any[]>} Array of results from the parallel executions
  */
 export async function all(name, producers) {
- return Promise.all(producers.map(((producer, i) => flow(`${name} [${i}/${producers.length}]`, producer))));
+	return Promise.all(
+		producers.map((producer, i) =>
+			flow(`${name} [${i}/${producers.length}]`, producer),
+		),
+	);
 }
 
 /**
@@ -109,35 +122,40 @@ export async function all(name, producers) {
  * @throws {Error} If called outside of a flow context.
  */
 export function queue({ name, fn, retries: maxRetriesConfigured }, userFn) {
-  // If userFn is provided, it means the old signature was used.
-  // Maintain backward compatibility for a bit, but log a warning.
-  if (typeof userFn === 'function') {
-    console.warn("[FlowQueue] DeprecationWarning: `queue({ name, retries }, fn)` signature is deprecated. Use `queue({ name, fn, retries })` instead.");
-    // Adapt to the new structure
-    return _queue({ name, fn: userFn, retries: maxRetriesConfigured });
-  }
-  // New signature: queue({ name, fn, retries })
-  return _queue({ name, fn, retries: maxRetriesConfigured });
+	// If userFn is provided, it means the old signature was used.
+	// Maintain backward compatibility for a bit, but log a warning.
+	if (typeof userFn === "function") {
+		console.warn(
+			"[FlowQueue] DeprecationWarning: `queue({ name, retries }, fn)` signature is deprecated. Use `queue({ name, fn, retries })` instead.",
+		);
+		// Adapt to the new structure
+		return _queue({ name, fn: userFn, retries: maxRetriesConfigured });
+	}
+	// New signature: queue({ name, fn, retries })
+	return _queue({ name, fn, retries: maxRetriesConfigured });
 }
 
 function _queue({ name, fn, retries: maxRetriesConfigured }) {
- const parent = cacheStorage.getStore();
- if (!parent || !parent.queue) { // Check specifically for parent.queue
-  throw new Error('queue must be called within a flow context that has an initialized queue.');
- }
+	const parent = cacheStorage.getStore();
+	if (!parent || !parent.queue) {
+		// Check specifically for parent.queue
+		throw new Error(
+			"queue must be called within a flow context that has an initialized queue.",
+		);
+	}
 
- const taskToPush = {
-  fn: () => fn(), // The actual function to execute
-  label: name,     // Label for logging
-  retries: 0,      // Initial retry count for this queue's processing of the task
- };
+	const taskToPush = {
+		fn: () => fn(), // The actual function to execute
+		label: name, // Label for logging
+		retries: 0, // Initial retry count for this queue's processing of the task
+	};
 
- if (typeof maxRetriesConfigured === 'number') {
-  taskToPush.maxRetriesConfigured = maxRetriesConfigured; // Store specific retry limit for this task
- }
-  // Note: The `asyncQueue` in the root flow initialization is what uses `task.retries`
-  // and `maxRetries` (or `task.maxRetriesConfigured`).
- return parent.queue.push(taskToPush);
+	if (typeof maxRetriesConfigured === "number") {
+		taskToPush.maxRetriesConfigured = maxRetriesConfigured; // Store specific retry limit for this task
+	}
+	// Note: The `asyncQueue` in the root flow initialization is what uses `task.retries`
+	// and `maxRetries` (or `task.maxRetriesConfigured`).
+	return parent.queue.push(taskToPush);
 }
 
 /**
@@ -148,7 +166,7 @@ function _queue({ name, fn, retries: maxRetriesConfigured }) {
  * @returns {(...args: Parameters<F>) => ReturnType<F>} A function that will execute the task in a flow context when called
  */
 export function deferred(taskName, taskFn) {
- return (...args) => flow(taskName, () => taskFn(...args));
+	return (...args) => flow(taskName, () => taskFn(...args));
 }
 
 /**
@@ -173,40 +191,38 @@ export function deferred(taskName, taskFn) {
  * @returns {Promise<R>} - The processing result
  */
 export async function recursiveProcessor(
- initialData,
- { generateSubtaskData, processor, maxPasses, storeSubtaskResult }
-){
+	initialData,
+	{ generateSubtaskData, processor, maxPasses, storeSubtaskResult },
+) {
+	storeSubtaskResult ??= (subtask, result) => {
+		subtask.result = result;
+	};
+	/**
+	 * Internal recursive function to process data
+	 */
+	async function runProcessing(data, pass) {
+		// Process the current data
+		const result = await processor(data, { pass });
 
- storeSubtaskResult ??= ((subtask, result) => { subtask.result = result; });
- /**
-  * Internal recursive function to process data
-  */
- async function runProcessing(data, pass) {
-  // Process the current data
-  const result = await processor(data, { pass });
+		// Check if we should continue to the next level of recursion
+		if (pass < maxPasses) {
+			// Get all subtasks from the result
+			const subtasks = generateSubtaskData(result, pass);
 
-  // Check if we should continue to the next level of recursion
-  if (pass < maxPasses) {
-   // Get all subtasks from the result
-   const subtasks = generateSubtaskData(result, pass);
+			await Promise.all(
+				subtasks.map(async (data, i) => {
+					// Process the subtask recursively
+					const subtaskResult = await runProcessing(data, pass + 1);
 
-   await Promise.all(subtasks.map( async (data, i) => {
-      // Process the subtask recursively
-      const subtaskResult = await runProcessing(
-       data,
-       pass + 1,
-      );
+					// Store the result back in the subtask
+					storeSubtaskResult(data, subtaskResult);
+				}),
+			);
+		}
 
-      // Store the result back in the subtask
-      storeSubtaskResult(data, subtaskResult);
-     },
-    )
-   );
-  }
+		return result;
+	}
 
-  return result;
- }
-
- // Start the processing with the initial data at pass 1
- return runProcessing(initialData, 1);
+	// Start the processing with the initial data at pass 1
+	return runProcessing(initialData, 1);
 }

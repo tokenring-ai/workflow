@@ -5,5 +5,3 @@ export * as chatCommands from "./chatCommands.js";
 export const name = "@token-ring/workflow";
 export const description = "Workflow Service that runs chat workflows";
 export const version = "0.1.0";
-
-

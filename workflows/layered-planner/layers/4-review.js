@@ -7,49 +7,51 @@ import { Runnable } from "../../../../runnable/runnable.js";
  * JSON Schema for review response, compatible with OpenAI function calling
  */
 const reviewResponseSchema = {
- type: "object",
- properties: {
-  isComplete: {
-   type: "boolean",
-   description: "Whether the decomposed task is complete based on all subtask results"
-  },
-  summary: {
-   type: "string",
-   description: "A summary of the overall task completion and findings"
-  },
-  subtaskReviews: {
-   type: "array",
-   items: {
-    type: "object",
-    properties: {
-     subtaskDescription: {
-      type: "string",
-      description: "Description of the subtask being reviewed"
-     },
-     status: {
-      type: "string",
-      enum: ["complete", "incomplete", "partial"],
-      description: "Status of the subtask completion"
-     },
-     feedback: {
-      type: "string",
-      description: "Detailed feedback on the subtask result"
-     }
-    },
-    required: ["subtaskDescription", "status", "feedback"]
-   },
-   description: "Individual reviews for each subtask"
-  },
-  nextSteps: {
-   type: "array",
-   items: {
-    type: "string"
-   },
-   description: "Recommended next steps if any subtasks are incomplete or if follow-up work is needed"
-  }
- },
- required: ["isComplete", "summary", "subtaskReviews"],
- additionalProperties: false
+	type: "object",
+	properties: {
+		isComplete: {
+			type: "boolean",
+			description:
+				"Whether the decomposed task is complete based on all subtask results",
+		},
+		summary: {
+			type: "string",
+			description: "A summary of the overall task completion and findings",
+		},
+		subtaskReviews: {
+			type: "array",
+			items: {
+				type: "object",
+				properties: {
+					subtaskDescription: {
+						type: "string",
+						description: "Description of the subtask being reviewed",
+					},
+					status: {
+						type: "string",
+						enum: ["complete", "incomplete", "partial"],
+						description: "Status of the subtask completion",
+					},
+					feedback: {
+						type: "string",
+						description: "Detailed feedback on the subtask result",
+					},
+				},
+				required: ["subtaskDescription", "status", "feedback"],
+			},
+			description: "Individual reviews for each subtask",
+		},
+		nextSteps: {
+			type: "array",
+			items: {
+				type: "string",
+			},
+			description:
+				"Recommended next steps if any subtasks are incomplete or if follow-up work is needed",
+		},
+	},
+	required: ["isComplete", "summary", "subtaskReviews"],
+	additionalProperties: false,
 };
 
 /**
@@ -61,24 +63,33 @@ const reviewResponseSchema = {
  * @param {TokenRingRegistry} registry - The package registry
  * @returns {Promise<Object>} - The review result
  */
-async function reviewResults({ request, decomposition, executionResults, registry }) {
- const modelRegistry = registry.requireFirstServiceByType(ModelRegistry);
- const chatService = registry.requireFirstServiceByType(ChatService);
+async function reviewResults({
+	request,
+	decomposition,
+	executionResults,
+	registry,
+}) {
+	const modelRegistry = registry.requireFirstServiceByType(ModelRegistry);
+	const chatService = registry.requireFirstServiceByType(ChatService);
 
- return await flow('task-review', async () => {
-  chatService.systemLine("[TaskReviewer] Reviewing subtask results to determine task completion...");
+	return await flow("task-review", async () => {
+		chatService.systemLine(
+			"[TaskReviewer] Reviewing subtask results to determine task completion...",
+		);
 
-  // Format the subtask results for review
-  const subtaskResultsText = executionResults.map((result, index) => {
-   return `
+		// Format the subtask results for review
+		const subtaskResultsText = executionResults
+			.map((result, index) => {
+				return `
 SUBTASK ${index + 1}:
 Description: ${result.subtask.description}
 Rationale: ${result.subtask.rationale}
 Response: ${result.response}
       `.trim();
-  }).join('\n\n');
+			})
+			.join("\n\n");
 
-  const prompt = `You are a task reviewer. Your job is to evaluate the results of executed subtasks and determine if the overall decomposed task is complete.
+		const prompt = `You are a task reviewer. Your job is to evaluate the results of executed subtasks and determine if the overall decomposed task is complete.
 
 ORIGINAL TASK DECOMPOSITION:
 ${JSON.stringify(decomposition, null, 2)}
@@ -95,42 +106,56 @@ REVIEW INSTRUCTIONS:
 - If the task is incomplete, identify what remains to be done
 - Provide a comprehensive summary of the review`;
 
-  const client = await modelRegistry.getFirstOnlineClient({
-   tags: ['analyze', 'reasoning']
-  });
+		const client = await modelRegistry.getFirstOnlineClient({
+			tags: ["analyze", "reasoning"],
+		});
 
-  const newMessages = [...request.messages, { role: 'user', content: prompt }];
+		const newMessages = [
+			...request.messages,
+			{ role: "user", content: prompt },
+		];
 
-  // Generate object using schema
-  const [review] = await client.generateObject({
-   ...request,
-   messages: newMessages,
-   schema: reviewResponseSchema,
-   temperature: 0.2
-  }, registry);
+		// Generate object using schema
+		const [review] = await client.generateObject(
+			{
+				...request,
+				messages: newMessages,
+				schema: reviewResponseSchema,
+				temperature: 0.2,
+			},
+			registry,
+		);
 
-  chatService.systemLine(`[TaskReviewer] Review completed. Task is ${review.isComplete ? 'complete' : 'incomplete'}.`);
+		chatService.systemLine(
+			`[TaskReviewer] Review completed. Task is ${review.isComplete ? "complete" : "incomplete"}.`,
+		);
 
-  // Return the review result along with the original request, decomposition, and execution results
- return {
-  request,
-  decomposition,
-  executionResults,
-  review
- };
- });
+		// Return the review result along with the original request, decomposition, and execution results
+		return {
+			request,
+			decomposition,
+			executionResults,
+			review,
+		};
+	});
 }
 
 export default class ReviewRunnable extends Runnable {
-  async *invoke(context, { serviceRegistry }) {
-    const wfCtx = {
-      request: context.request,
-      decomposition: context.plan.decomposition,
-      executionResults: context.executionResults
-    };
-    const result = await reviewResults({ ...wfCtx, registry: serviceRegistry });
-    context.review = result;
-    yield { type: 'log', level: 'info', message: 'Review complete', timestamp: Date.now(), runnableName: this.name };
-    return context;
-  }
+	async *invoke(context, { serviceRegistry }) {
+		const wfCtx = {
+			request: context.request,
+			decomposition: context.plan.decomposition,
+			executionResults: context.executionResults,
+		};
+		const result = await reviewResults({ ...wfCtx, registry: serviceRegistry });
+		context.review = result;
+		yield {
+			type: "log",
+			level: "info",
+			message: "Review complete",
+			timestamp: Date.now(),
+			runnableName: this.name,
+		};
+		return context;
+	}
 }
