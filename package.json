@@ -1,0 +1,29 @@
+{
+  "name": "@token-ring/workflow",
+  "version": "0.1.0",
+  "dependencies": {
+    "@token-ring/ai-client": "0.1.0",
+    "@token-ring/chat": "0.1.0",
+    "@token-ring/eslint-config": "0.0.0",
+    "@token-ring/filesystem": "0.1.0",
+    "@token-ring/registry": "0.1.0",
+    "async": "^3.2.6",
+    "async-es": "^3.2.6",
+    "eventemitter3": "^5.0.1"
+  },
+  "exports": {
+    ".": "./index.js",
+    "./*": "./*.js"
+  },
+  "private": true,
+  "scripts": {
+    "lint": "eslint .",
+    "eslint": "eslint --fix ./",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "type": "module",
+  "devDependencies": {
+    "vitest": "^1.3.1"
+  }
+}
