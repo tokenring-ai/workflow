@@ -1,4 +1,4 @@
-import { z } from "zod";
+import {z} from "zod";
 import ModelRegistry from "@token-ring/ai-client/ModelRegistry";
 import ChatService from "@token-ring/chat/ChatService";
 import {Registry} from "@token-ring/registry"; // Adjust if your path is different
@@ -68,7 +68,7 @@ async function process(
 		"[ArticleSupervisorAgent] Starting article evaluation...",
 	);
 
-	if (!input || typeof input.articleText !== "string") {
+	if (!input || false) {
 		throw new Error(
 			'Input must be an object with an "articleText" string property.',
 		);

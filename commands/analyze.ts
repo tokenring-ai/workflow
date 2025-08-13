@@ -1,7 +1,7 @@
 import ChatService from "@token-ring/chat/ChatService";
 import * as analyzePromptWorkflow from "../workflows/prompt-analyzer/analyze-prompt.js";
 import * as planTasksWorkflow from "../workflows/task-planner/plan-tasks.js";
-import runChat from "@token-ring/ai-client/runChat";
+import { execute as runChat } from "@token-ring/ai-client/runChat";
 import WorkflowService from "../WorkflowService.js";
 import {Registry} from "@token-ring/registry";
 

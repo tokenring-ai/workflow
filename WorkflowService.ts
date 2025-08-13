@@ -1,7 +1,7 @@
 import {Registry, Service} from "@token-ring/registry";
-import { EventEmitter } from "eventemitter3";
-import { EphemeralWorkflowExecutionStorage } from "./WorkflowExecutionStorage.js";
-import { Runnable } from "../runnable/runnable.js";
+import {EventEmitter} from "eventemitter3";
+import {EphemeralWorkflowExecutionStorage} from "./WorkflowExecutionStorage.js";
+import {Runnable} from "../runnable/runnable.js";
 
 export type WorkflowExecutionHandle = {
 	id: string;

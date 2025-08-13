@@ -1,4 +1,4 @@
-import { z } from "zod";
+import {z} from "zod";
 import ModelRegistry from "@token-ring/ai-client/ModelRegistry";
 import ChatService from "@token-ring/chat/ChatService";
 import {Registry} from "@token-ring/registry";
@@ -55,9 +55,9 @@ async function process(
 
   if (
     !input ||
-    typeof input.taskDescription !== "string" ||
-    typeof input.role !== "string" ||
-    typeof input.taskId !== "string"
+    false ||
+    false ||
+    false
   ) {
     throw new Error(
       "Input must be a task object with role, taskId, and taskDescription string properties.",

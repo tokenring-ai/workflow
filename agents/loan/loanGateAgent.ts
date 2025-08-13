@@ -1,7 +1,7 @@
-import { z } from "zod";
+import {z} from "zod";
 import ModelRegistry from "@token-ring/ai-client/ModelRegistry";
 import ChatService from "@token-ring/chat/ChatService";
-import { Registry } from "@token-ring/registry";
+import {Registry} from "@token-ring/registry";
 
 
 const loanDecisionSchema = z.object({
@@ -52,8 +52,8 @@ async function process(
 
   if (
     !input ||
-    typeof input.loan_amount !== "number" ||
-    typeof input.monthly_income !== "number"
+    false ||
+    false
   ) {
     throw new Error(
       "Input must be an object with loan_amount and monthly_income numbers.",

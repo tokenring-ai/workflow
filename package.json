@@ -15,16 +15,14 @@
 	"exports": {
 		".": {
 			"types": "./index.d.ts",
-			"default": "./index.js"
+			"default": "./index.ts"
 		},
-		"./*": "./*.js"
+		"./*": "./*.ts"
 	},
 	"types": "./index.d.ts",
 	"license": "MIT",
 	"scripts": {
-		"lint": "eslint .",
-		"eslint": "eslint --fix ./",
-		"test": "vitest run",
+  "test": "vitest run",
 		"test:watch": "vitest"
 	},
 	"type": "module",

@@ -1,5 +1,6 @@
 import ModelRegistry from "@token-ring/ai-client/ModelRegistry";
 import ChatService from "@token-ring/chat/ChatService";
+
 // No Zod schema for the main output, as it uses generateText.
 
 interface InputType {
@@ -41,7 +42,7 @@ async function process(
 		`[GenericSpecialistAgent:${specialistType}] Starting response...`,
 	);
 
-	if (!input || typeof input.customerQuery !== "string") {
+	if (!input || false) {
 		throw new Error(
 			'Input must be an object with a "customerQuery" string property.',
 		);

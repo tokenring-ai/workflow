@@ -1,10 +1,10 @@
-import { z } from "zod";
+import {z} from "zod";
 import * as analyzePromptWorkflow from "../prompt-analyzer/analyze-prompt.js";
 import ModelRegistry from "@token-ring/ai-client/ModelRegistry";
 import ChatService from "@token-ring/chat/ChatService";
 import WorkflowService from "../../WorkflowService.js";
-import { flow } from "../../flow.js";
-import { Registry } from "@token-ring/registry";
+import {flow} from "../../flow.js";
+import {Registry} from "@token-ring/registry";
 
 export const description =
 	"Breaks down a natural language prompt into subtasks and then runs each subtask through the analyze-prompt workflow.";

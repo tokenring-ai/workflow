@@ -1,6 +1,6 @@
 // layerConfigExample.ts
 
-import { z } from "zod";
+import {z} from "zod";
 
 // ----------------------------
 // Zod Schemas for Each Layer
@@ -90,7 +90,7 @@ interface Layer {
   width: number;
   temperature: number;
   promptGuidelines: string;
-  schema: z.ZodType<any>;
+  schema: z.ZodType;
 }
 
 // ----------------------------

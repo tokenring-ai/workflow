@@ -1,7 +1,6 @@
 import ModelRegistry from "@token-ring/ai-client/ModelRegistry"; // Adjusted import path
 import ChatService from "@token-ring/chat/ChatService";
-import { Runnable } from "../../../runnable/runnable.js"; // Fixed import path
-import { Registry } from "@token-ring/registry";
+import {Runnable} from "@token-ring/runnable"; // Fixed import path
 
 
 /**
@@ -62,7 +61,7 @@ export class TranslateAgent extends Runnable<TranslateAgentInput, TranslateAgent
    * @returns An object containing the translated text and target language.
    */
   async *invoke(input: TranslateAgentInput, context?: any): AsyncGenerator<any, TranslateAgentOutput, void> {
-    if (!input || typeof input.textToTranslate !== "string") {
+    if (!input || false) {
       yield { 
         type: 'log', 
         level: 'error', 

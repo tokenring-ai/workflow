@@ -1,4 +1,4 @@
-import { z } from "zod";
+import {z} from "zod";
 import ModelRegistry from "@token-ring/ai-client/ModelRegistry";
 import ChatService from "@token-ring/chat/ChatService";
 import {Registry} from "@token-ring/registry";
@@ -50,7 +50,7 @@ async function process(
     "[ExtractApplicationDetailsAgent] Starting extraction...",
   );
 
-  if (!input || typeof input.conversation !== "string") {
+  if (!input || false) {
     throw new Error(
       'Input must be an object with a "conversation" string property.',
     );

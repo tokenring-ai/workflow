@@ -1,12 +1,12 @@
-import { flow } from "../../flow.js";
-import { z } from "zod";
+import {flow} from "../../flow.js";
+import {z} from "zod";
 import analyzePayload from "./analyze-payload.js";
-import { ChatService } from "@token-ring/chat";
-import { FileSystemService } from "@token-ring/filesystem";
-import { createChatRequest } from "@token-ring/ai-client";
+import {ChatService} from "@token-ring/chat";
+import {FileSystemService} from "@token-ring/filesystem";
+import {createChatRequest} from "@token-ring/ai-client";
 import {Registry} from "@token-ring/registry";
 import {ChatInputMessage} from "@token-ring/ai-client/client/AIChatClient";
-import { FileIndexService } from "@token-ring/file-index";
+import {FileIndexService} from "@token-ring/file-index";
 
 export const description =
 	"Analyze a prompt and determine optimal parameters, model, task complexity, and files";

@@ -1,5 +1,5 @@
 import runChainingWorkflow from "./chainingWorkflow.js";
-import { createLayeredPlannerWorkflow } from "./layered-planner/index.js";
+import {createLayeredPlannerWorkflow} from "./layered-planner";
 import runRoutingWorkflow from "./routingWorkflow.js";
 import runSimpleParallelWorkflow from "./simpleParallelWorkflow.js";
 import runOrchestratorWorkersWorkflow from "./orchestratorWorkersWorkflow.js";

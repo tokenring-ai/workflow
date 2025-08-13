@@ -1,7 +1,7 @@
 // Example demonstrating the usage of the flow library
 // noinspection JSUnusedLocalSymbols
 
-import { flow, parallel, all, queue, deferred } from "../flow.js";
+import {all, deferred, flow, parallel, queue} from "../flow.js";
 
 interface UserData {
   id: number;

@@ -1,6 +1,6 @@
-import { describe, it, expect } from "vitest";
+import {describe, expect, it} from "vitest";
 import WorkflowService from "../WorkflowService.js";
-import { Runnable } from "@token-ring/runnable/runnable";
+import {Runnable} from "@token-ring/runnable/runnable";
 
 class SimpleRunnable extends Runnable {
 	async *invoke(input: number, context: { abortSignal: AbortSignal }): AsyncGenerator<{ type: string, message: string, timestamp: number }, number, unknown> {

@@ -1,8 +1,8 @@
 import ModelRegistry from "@token-ring/ai-client/ModelRegistry";
 import ChatService from "@token-ring/chat/ChatService";
-import { z } from "zod";
-import { flow } from "../../../flow.js";
-import { Runnable } from "../../../../runnable/runnable.js";
+import {z} from "zod";
+import {flow} from "../../../flow.js";
+import {Runnable} from "@token-ring/runnable";
 import {Registry} from "@token-ring/registry";
 
 // Types for the execute layer
@@ -225,48 +225,19 @@ ${JSON.stringify(executionResponseSchema, null, 2)}
         artifacts: [],
         toolInvocations: []
       };
-    } else if (typeof response === 'string') {
-      // Handle case where response is a string
-      try {
-        structuredResult = JSON.parse(response);
-      } catch (e) {
-        structuredResult = {
-          result: response,
-          isSuccessful: false,
-          artifacts: [],
-          toolInvocations: []
-        };
-      }
-    } else if (typeof response === 'object' && response !== null) {
-      // Handle object response (could be direct or have a content property)
-      if (response.content) {
-        if (typeof response.content === 'string') {
-          try {
-            structuredResult = JSON.parse(response.content);
-          } catch (e) {
-            structuredResult = {
-              result: response.content,
-              isSuccessful: false,
-              artifacts: [],
-              toolInvocations: []
-            };
-          }
-        } else {
-          // content is already an object
-          structuredResult = response.content;
-        }
-      } else {
-        // Response is the structured data itself
-        structuredResult = response as unknown as ExecutionResponse;
-      }
     } else {
-      // Fallback for unexpected response format
-      structuredResult = {
-        result: "Unexpected response format",
-        isSuccessful: false,
-        artifacts: [],
-        toolInvocations: []
-      };
+        { // Handle case where response is a string
+            try {
+                structuredResult = JSON.parse(response);
+            } catch (e) {
+                structuredResult = {
+                    result: response,
+                    isSuccessful: false,
+                    artifacts: [],
+                    toolInvocations: []
+                };
+            }
+        }
     }
 
     // Validate the structuredResult against the schema if possible (optional, depends on Zod usage)

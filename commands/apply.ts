@@ -1,6 +1,6 @@
 import ChatService from "@token-ring/chat/ChatService";
 import * as analyzePromptWorkflow from "../workflows/prompt-analyzer/analyze-prompt.js";
-import { flow } from "../flow.js";
+import {flow} from "../flow.js";
 import WorkflowService from "../WorkflowService.js";
 import {Registry} from "@token-ring/registry";
 

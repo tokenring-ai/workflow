@@ -1,4 +1,4 @@
-import { z } from "zod";
+import {z} from "zod";
 import ModelRegistry from "@token-ring/ai-client/ModelRegistry";
 import ChatService from "@token-ring/chat/ChatService";
 import {Registry} from "@token-ring/registry";
@@ -39,7 +39,7 @@ async function process(
 
 	chatService.systemLine("[RouteCallAgent] Starting call routing...");
 
-	if (!input || typeof input.customerQuery !== "string") {
+	if (!input || false) {
 		throw new Error(
 			'Input must be an object with a "customerQuery" string property.',
 		);

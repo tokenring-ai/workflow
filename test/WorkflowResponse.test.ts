@@ -1,10 +1,6 @@
-import { describe, it, expect, vi } from "vitest";
-import { WorkflowResponse } from "../WorkflowResponse.js";
-import { 
-  WorkflowEvent, 
-  WorkflowResponseType,
-  BaseWorkflowEvent 
-} from "../workflowEvents.js";
+import {describe, expect, it} from "vitest";
+import {WorkflowResponse} from "../WorkflowResponse.js";
+import {BaseWorkflowEvent, WorkflowEvent, WorkflowResponseType} from "../workflowEvents.js";
 
 // Helper to create a mock async generator
 async function* mockAsyncGenerator<T = any>(

@@ -1,6 +1,6 @@
 // core/workflow/persistenceProvider.ts
 
-import type { WorkflowContext } from '../runnable/runnable.js';
+import type {WorkflowContext} from '../runnable/runnable.js';
 
 /**
  * Record representing the saved state of a workflow

@@ -1,8 +1,8 @@
 import ModelRegistry from "@token-ring/ai-client/ModelRegistry";
 import ChatService from "@token-ring/chat/ChatService";
-import { flow } from "../../../flow.js";
-import { Runnable } from "../../../../runnable/runnable.js";
-import { Registry } from "@token-ring/registry";
+import {flow} from "../../../flow.js";
+import {Runnable} from "@token-ring/runnable";
+import {Registry} from "@token-ring/registry";
 
 /**
  * Types for task decomposition

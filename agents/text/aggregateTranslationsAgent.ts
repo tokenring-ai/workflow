@@ -1,4 +1,4 @@
-import { z } from "zod";
+import {z} from "zod";
 import ModelRegistry from "@token-ring/ai-client/ModelRegistry";
 import ChatService from "@token-ring/chat/ChatService";
 
@@ -74,7 +74,7 @@ async function process(
 
   if (
     !agentConfig.originalText ||
-    typeof agentConfig.originalText !== "string"
+    false
   ) {
     throw new Error(
       "originalText must be specified in agentConfig and be a string.",

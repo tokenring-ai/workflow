@@ -1,10 +1,10 @@
 // core/workflow/WorkflowResponse.ts
 
 import type {
-	WorkflowEvent,
-	WorkflowFinalOutputEvent,
-	WorkflowSchemaEvent,
-	WorkflowResponseType,
+    WorkflowEvent,
+    WorkflowFinalOutputEvent,
+    WorkflowResponseType,
+    WorkflowSchemaEvent,
 } from "./workflowEvents.js";
 
 /**
@@ -19,8 +19,8 @@ import type {
  * This class provides a view over that single pass.
  */
 export class WorkflowResponse {
-	private _asyncGenerator: WorkflowResponseType<any>;
-	private _initialMetadata: any;
+	private _asyncGenerator: WorkflowResponseType;
+	private readonly _initialMetadata: any;
 	private _responsePromise: Promise<any> | null = null;
 	private _schemaPromise: Promise<any> | null = null;
 	private _eventBuffer: WorkflowEvent[] = [];
@@ -32,7 +32,7 @@ export class WorkflowResponse {
 	 * @param asyncGenerator - The async generator from a Runnable's invoke method.
 	 * @param initialMetadata - Initial metadata like workflowInstanceId, definitionId.
 	 */
-	constructor(asyncGenerator: WorkflowResponseType<any>, initialMetadata: any = {}) {
+	constructor(asyncGenerator: WorkflowResponseType, initialMetadata: any = {}) {
 		this._asyncGenerator = asyncGenerator;
 		this._initialMetadata = initialMetadata;
 	}
@@ -61,7 +61,7 @@ export class WorkflowResponse {
 	 * or `outputSchema()` if they haven't been resolved yet, unless the stream
 	 * is carefully handled or buffered by this class (which it currently does).
 	 */
-	stream(): WorkflowResponseType<any> {
+	stream(): WorkflowResponseType {
 		// This returns a new generator that replays buffered events and then continues with the original.
 		// This allows multiple consumers of the stream to see all events from the beginning,
 		// provided the original generator hasn't been fully consumed by other methods like response() yet.
@@ -70,7 +70,7 @@ export class WorkflowResponse {
 		// eslint-disable-next-line @typescript-eslint/no-this-alias
 		const self = this; // To capture 'this' for the generator function
 
-		async function* replayableStream(): WorkflowResponseType<any> {
+		async function* replayableStream(): WorkflowResponseType {
 			// Yield buffered events first
 			for (const event of self._eventBuffer) {
 				yield event;

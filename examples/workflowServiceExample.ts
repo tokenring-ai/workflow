@@ -14,13 +14,13 @@
  * ```
  */
 import WorkflowService from "../WorkflowService.js";
-import { InMemoryPersistenceProvider } from "../persistenceProvider.js";
-import { RunnableError } from "../../runnable2/runnableError.js";
-import { RunnableLambda } from "../../runnable2/runnableLambda.js";
-import { RunnableSequence } from "../../runnable2/runnableSequence.js";
-import type { WorkflowContext } from "../../runnable2/runnable.js";
-import type { BaseWorkflowEvent } from "../workflowEvents.js";
-import type { WorkflowResponse } from "../WorkflowResponse.js";
+import {InMemoryPersistenceProvider} from "../persistenceProvider.js";
+import {RunnableError} from "../../runnable2/runnableError.js";
+import {RunnableLambda} from "../../runnable2/runnableLambda.js";
+import {RunnableSequence} from "../../runnable2/runnableSequence.js";
+import type {WorkflowContext} from "../../runnable2/runnable.js";
+import type {BaseWorkflowEvent} from "../workflowEvents.js";
+import type {WorkflowResponse} from "../WorkflowResponse.js";
 
 // --- Define some simple Runnables for the example workflow (now async generators) ---
 

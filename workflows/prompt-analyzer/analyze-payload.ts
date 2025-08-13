@@ -1,6 +1,6 @@
 import ModelRegistry from "@token-ring/ai-client/ModelRegistry";
 
-import { z } from "zod";
+import {z} from "zod";
 import {Registry} from "@token-ring/registry";
 
 const outputSchema = z.object({

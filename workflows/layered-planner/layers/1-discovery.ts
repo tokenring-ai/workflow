@@ -1,9 +1,9 @@
 import ModelRegistry from "@token-ring/ai-client/ModelRegistry";
 import ChatService from "@token-ring/chat/ChatService";
 import FileSystemService from "@token-ring/filesystem/FileSystemService";
-import { createChatRequest } from "@token-ring/ai-client";
-import { flow } from "../../../flow.js";
-import { Runnable } from "@token-ring/runnable";
+import {createChatRequest} from "@token-ring/ai-client";
+import {flow} from "../../../flow.js";
+import {Runnable} from "@token-ring/runnable";
 import {ChatInputMessage, ChatRequest} from "@token-ring/ai-client/client/AIChatClient";
 import {Registry} from "@token-ring/registry";
 
