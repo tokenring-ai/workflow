@@ -23,7 +23,10 @@ export async function flow<T = any>(
 ): Promise<T> {
 	const parent = cacheStorage.getStore();
 	if (parent == null) {
-		const queue = asyncQueue(async (task, done) => {
+		const queue = asyncQueue(async (
+			task: { fn: () => Promise<any>; retries: number; label: string; maxRetriesConfigured?: number },
+			done: (err: Error | null, result?: any) => void,
+		) => {
 			// This queue is for the root flow instance.
 			// It provides a coarse-grained retry mechanism for tasks (task.fn) submitted to it.
 			// If task.fn internally uses Runnables with their own .withRetry() or .withFallbacks(),
@@ -32,7 +35,7 @@ export async function flow<T = any>(
 			try {
 				const result = await task.fn();
 				done(null, result);
-			} catch (err) {
+			} catch (err: unknown) {
 				// The `task.retries` here is the retry count for *this specific queue's processing* of task.fn.
 				// It's distinct from any retries that might happen inside task.fn if it uses Runnables.
 				// `maxRetries` is the limit for this queue's retry attempts.
@@ -45,11 +48,12 @@ export async function flow<T = any>(
 					);
 					queue.push(task); // Re-queue the task for another attempt
 				} else {
+					const message = err instanceof Error ? err.message : String(err);
 					console.error(
 						`❌ [FlowQueue] Task "${task.label}" failed after ${(task.maxRetriesConfigured || maxRetries) + 1} attempts:`,
-						err.message,
+						message,
 					);
-					done(err); // Final failure after exhausting this queue's retries
+					done(err as Error); // Final failure after exhausting this queue's retries
 				}
 			}
 		}, 10); // Concurrency for this root flow's task queue.

@@ -133,11 +133,9 @@ export async function execute(remainder: string, registry: Registry): Promise<an
             );
             lastSubTaskResult = await runChat(
                 {
-                    input: subTask.input,
+                    input: subTask.input.map(m => ({ role: m.role, content: m.content ?? "" })) as any,
                     systemPrompt: chatService.getInstructions(),
-                    temperature: subTask.temperature,
-                    top_p: subTask.top_p,
-                    model: subTask.model,
+                    model: subTask.model!,
                 },
                 registry,
             );
@@ -150,11 +148,9 @@ export async function execute(remainder: string, registry: Registry): Promise<an
         );
         return runChat(
             {
-                input: analysisResult.input,
+                input: analysisResult.input.map(m => ({ role: m.role, content: m.content ?? "" })) as any,
                 systemPrompt: chatService.getInstructions(),
-                temperature: analysisResult.temperature,
-                top_p: analysisResult.top_p,
-                model: analysisResult.model,
+                model: analysisResult.model!,
             },
             registry,
         );

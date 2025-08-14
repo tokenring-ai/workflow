@@ -105,8 +105,8 @@ export async function execute(remainder: string, registry: Registry): Promise<vo
         chatService.systemLine("\nPlan execution completed.");
 
         // Clear the plan after execution
-        workflowService.currentPlan = null;
-        workflowService.planPrompt = null;
+        workflowService.currentPlan = [];
+        workflowService.planPrompt = "";
     } catch (error: any) {
         chatService.errorLine(`Error applying plan: ${error.message}`);
     }

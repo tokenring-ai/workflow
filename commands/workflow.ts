@@ -47,7 +47,7 @@ export async function execute(remainder: string, registry: Registry): Promise<vo
             break;
 
         case "run":
-            await handleRunCommand(actionArgs, chatService, workflowService);
+            await handleRunCommand(actionArgs, chatService, workflowService, registry);
             break;
 
         case "debug":
@@ -82,7 +82,8 @@ async function handleListCommand(
 async function handleRunCommand(
     args: string[],
     chatService: ChatService,
-    workflowService: WorkflowService
+    workflowService: WorkflowService,
+    registry: Registry
 ): Promise<void> {
     if (args.length === 0) {
         chatService.errorLine("Missing workflow name. Usage: /workflow run <name> [args...]");
@@ -101,9 +102,9 @@ async function handleRunCommand(
 
         // Parse arguments if needed
         let parsedArgs: any = workflowArgs;
-        if (workflowArgs && workflow.parseArgs) {
+        if (workflowArgs && (workflow as any).parseArgs) {
             try {
-                parsedArgs = workflow.parseArgs(workflowArgs);
+                parsedArgs = (workflow as any).parseArgs(workflowArgs);
             } catch (error: any) {
                 chatService.errorLine(`Error parsing arguments: ${error.message}`);
                 return;
@@ -111,7 +112,7 @@ async function handleRunCommand(
         }
 
         chatService.systemLine(`Running workflow: ${workflowName}`);
-        await chatService.run(workflow, parsedArgs);
+        await workflowService.run(workflow, parsedArgs, registry);
         chatService.systemLine(`Workflow ${workflowName} completed successfully`);
     } catch (error: any) {
         chatService.errorLine(`Error running workflow: ${error.message}`);
