@@ -29,7 +29,7 @@ async function basicFlowExample(): Promise<void> {
     // Simulate fetching data
     console.log("Fetching data...");
     await new Promise((resolve) => setTimeout(resolve, 500));
-    return { id: 1, name: "Sample Data" };
+    return {id: 1, name: "Sample Data"};
   });
 
   console.log("Result:", result);
@@ -49,7 +49,7 @@ async function nestedFlowExample(): Promise<void> {
     const userData = await flow<UserData>("fetchUserData", async () => {
       console.log("Fetching user data...");
       await new Promise((resolve) => setTimeout(resolve, 300));
-      return { id: 123, name: "John Doe" };
+      return {id: 123, name: "John Doe"};
     });
 
     // Nested flow for fetching user permissions
@@ -77,7 +77,7 @@ async function parallelExample(): Promise<void> {
   const results = await parallel<{ id: number; name: string }>("fetchItems", 3, async (index) => {
     console.log(`Fetching item ${index}...`);
     await new Promise((resolve) => setTimeout(resolve, 300));
-    return { id: index, name: `Item ${index}` };
+    return {id: index, name: `Item ${index}`};
   });
 
   console.log("Parallel results:", results);
@@ -121,12 +121,12 @@ async function queueExample(): Promise<void> {
     console.log("Starting main task...");
 
     // Queue up a queued task
-    const whenDone = queue({ 
-      name: "backgroundTask", 
+    const whenDone = queue({
+      name: "backgroundTask",
       fn: async () => {
         console.log("Background task running...");
       },
-      retries: 2 
+      retries: 2
     });
 
     console.log("Main task continuing without waiting for background task...");
@@ -149,19 +149,19 @@ async function deferredExample(): Promise<void> {
 
   // Create a deferred function
   const processItem = deferred<(item: Item) => Promise<ProcessedItem>>(
-    "processItem", 
+    "processItem",
     async (item: Item) => {
       console.log(`Processing ${item.name}...`);
       await new Promise((resolve) => setTimeout(resolve, 300));
-      return { ...item, processed: true };
+      return {...item, processed: true};
     }
   );
 
   // Use the deferred function later
   const items: Item[] = [
-    { id: 1, name: "Item A" },
-    { id: 2, name: "Item B" },
-    { id: 3, name: "Item C" },
+    {id: 1, name: "Item A"},
+    {id: 2, name: "Item B"},
+    {id: 3, name: "Item C"},
   ];
 
   const results: ProcessedItem[] = [];

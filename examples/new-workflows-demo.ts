@@ -3,14 +3,14 @@
 // you might need to run this with a flag like `node --experimental-vm-modules new-workflows-demo.js`
 // or ensure your Node version inherently supports ESM for .js files.
 
-import {
-    runChainingWorkflow,
-    runEvaluatorOptimizerWorkflow,
-    runOrchestratorWorkersWorkflow,
-    runRoutingWorkflow,
-    runSimpleParallelWorkflow,
-} from "../workflows/index.js";
 import {z} from "zod";
+import {
+  runChainingWorkflow,
+  runEvaluatorOptimizerWorkflow,
+  runOrchestratorWorkersWorkflow,
+  runRoutingWorkflow,
+  runSimpleParallelWorkflow,
+} from "../workflows/index.js";
 
 // Define interfaces for our mock services and objects
 
@@ -161,7 +161,7 @@ const mockChatService: MockChatService = {
 };
 
 const mockAiClient: MockAiClient = {
-  generateObject: async ({ messages, schema, prompt }, registry) => {
+  generateObject: async ({messages, schema, prompt}, registry) => {
     mockChatService.systemLine(
       `MockAIClient.generateObject called. System Prompt: ${prompt}`,
     );
@@ -213,7 +213,7 @@ const mockAiClient: MockAiClient = {
       const appData = JSON.parse(userInput);
       const isAccepted =
         appData.loan_amount / appData.loan_time_in_months <
-          0.3 * appData.monthly_income && appData.loan_amount > 0;
+        0.3 * appData.monthly_income && appData.loan_amount > 0;
       return {
         object: {
           is_client_accepted: isAccepted,
@@ -228,19 +228,19 @@ const mockAiClient: MockAiClient = {
         userInput.toLowerCase().includes("internet") ||
         userInput.toLowerCase().includes("technical")
       ) {
-        return { object: { agent_type: "technical" } };
+        return {object: {agent_type: "technical"}};
       } else if (
         userInput.toLowerCase().includes("bill") ||
         userInput.toLowerCase().includes("account")
       ) {
-        return { object: { agent_type: "account" } };
+        return {object: {agent_type: "account"}};
       } else if (
         userInput.toLowerCase().includes("payment") ||
         userInput.toLowerCase().includes("finance")
       ) {
-        return { object: { agent_type: "finance" } };
+        return {object: {agent_type: "finance"}};
       }
-      return { object: { agent_type: "unknown" } };
+      return {object: {agent_type: "unknown"}};
     } else if (prompt?.includes("aggregating translations")) {
       // For aggregateTranslationsAgent
       // Input will be a stringified version of the array of translation outputs + original text
@@ -398,7 +398,7 @@ const mockAiClient: MockAiClient = {
         feedback = "Excellent, this is now complete and satisfactory.";
       }
 
-      return { object: { feedback, satisfied, score: satisfied ? 8 : 4 } };
+      return {object: {feedback, satisfied, score: satisfied ? 8 : 4}};
     }
     // Fallback for other schema-based calls
     mockChatService.errorLine(
@@ -410,7 +410,7 @@ const mockAiClient: MockAiClient = {
       },
     };
   },
-  generateText: async ({ messages, prompt }, registry) => {
+  generateText: async ({messages, prompt}, registry) => {
     mockChatService.systemLine(
       `MockAIClient.generateText called. System Prompt: ${prompt}`,
     );
@@ -418,11 +418,11 @@ const mockAiClient: MockAiClient = {
 
     if (prompt?.includes("translate the following text")) {
       // For translateAgent
-      if (prompt.includes("to German")) return { text: `GERMAN: ${userInput}` };
+      if (prompt.includes("to German")) return {text: `GERMAN: ${userInput}`};
       if (prompt.includes("to Spanish"))
-        return { text: `SPANISH: ${userInput}` };
-      if (prompt.includes("to Polish")) return { text: `POLISH: ${userInput}` };
-      return { text: `TRANSLATION_UNHANDLED_LANG: ${userInput}` };
+        return {text: `SPANISH: ${userInput}`};
+      if (prompt.includes("to Polish")) return {text: `POLISH: ${userInput}`};
+      return {text: `TRANSLATION_UNHANDLED_LANG: ${userInput}`};
     } else if (prompt?.includes("You are a writer.")) {
       // For ArticleWriterAgent
       articleWriterCallCount++; // Increment call count for supervisor logic
@@ -671,8 +671,10 @@ async function demoRoutingWorkflow(): Promise<void> {
 async function main(): Promise<void> {
   // Check if ModelRegistry and ChatService are correctly mocked
   if (
-    !mockRegistry.requireFirstServiceByType(function ChatService() {}) ||
-    !mockRegistry.requireFirstServiceByType(function ModelRegistry() {})
+    !mockRegistry.requireFirstServiceByType(function ChatService() {
+    }) ||
+    !mockRegistry.requireFirstServiceByType(function ModelRegistry() {
+    })
       .getFirstOnlineClient
   ) {
     console.error("Registry or services are not mocked correctly. Exiting.");
@@ -695,7 +697,7 @@ async function demoSimpleParallelWorkflow(): Promise<void> {
 
   const textToTranslate =
     "AI Agents can work together in workflows. This is a powerful concept.";
-  const parallelInitialInput = { textToTranslate }; // Input for each worker
+  const parallelInitialInput = {textToTranslate}; // Input for each worker
 
   const translationParallelDef: ParallelWorkflowDef = {
     id: "parallelTextTranslation",
@@ -706,23 +708,23 @@ async function demoSimpleParallelWorkflow(): Promise<void> {
       {
         id: "translator-de",
         agentModulePath: "../agents/text/translateAgent.js",
-        config: { targetLanguage: "German", sourceLanguage: "English" },
+        config: {targetLanguage: "German", sourceLanguage: "English"},
         // inputMapping: null; // Takes the whole parallelInitialInput
       },
       {
         id: "translator-es",
         agentModulePath: "../agents/text/translateAgent.js",
-        config: { targetLanguage: "Spanish" }, // Default source: English
+        config: {targetLanguage: "Spanish"}, // Default source: English
       },
       {
         id: "translator-pl",
         agentModulePath: "../agents/text/translateAgent.js",
-        config: { targetLanguage: "Polish" },
+        config: {targetLanguage: "Polish"},
       },
     ],
     aggregatorAgent: {
       agentModulePath: "../agents/text/aggregateTranslationsAgent.js",
-      config: { originalText: textToTranslate }, // Pass original text to aggregator
+      config: {originalText: textToTranslate}, // Pass original text to aggregator
     },
   };
 
@@ -760,15 +762,15 @@ async function demoOrchestratorWorkersWorkflow(): Promise<void> {
     workerAgentsMap: {
       developer: {
         agentModulePath: "../agents/projectManagement/estimationAgent.js",
-        config: { roleContext: "You are a senior software developer." },
+        config: {roleContext: "You are a senior software developer."},
       },
       qa: {
         agentModulePath: "../agents/projectManagement/estimationAgent.js",
-        config: { roleContext: "You are a QA engineer." },
+        config: {roleContext: "You are a QA engineer."},
       },
       devops: {
         agentModulePath: "../agents/projectManagement/estimationAgent.js",
-        config: { roleContext: "You are a DevOps engineer." },
+        config: {roleContext: "You are a DevOps engineer."},
       },
     },
     aggregatorAgent: {

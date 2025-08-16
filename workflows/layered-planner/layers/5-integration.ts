@@ -1,8 +1,8 @@
 import ModelRegistry from "@token-ring/ai-client/ModelRegistry";
 import ChatService from "@token-ring/chat/ChatService";
-import {flow} from "../../../flow.js";
-import {Runnable} from "@token-ring/runnable";
 import {Registry} from "@token-ring/registry";
+import {Runnable} from "@token-ring/runnable";
+import {flow} from "../../../flow.js";
 
 // Define interfaces for the integration layer
 interface SubtaskFeedback {
@@ -35,6 +35,7 @@ interface ExecutionResult {
     success?: boolean;
     [key: string]: any;
   };
+
   [key: string]: any;
 }
 
@@ -54,35 +55,36 @@ interface IntegrationContext {
   plan: any;
   executionResults: ExecutionResult[];
   integration?: IntegrationResult;
+
   [key: string]: any;
 }
 
 const integrationSchema = {
   type: "object",
   properties: {
-    isComplete: { type: "boolean" },
-    summary: { type: "string" },
+    isComplete: {type: "boolean"},
+    summary: {type: "string"},
     subtaskFeedback: {
       type: "array",
       items: {
         type: "object",
         properties: {
-          subtaskDescription: { type: "string" },
-          executionResult: { type: "string" },
-          status: { type: "string" },
-          notes: { type: "string" },
+          subtaskDescription: {type: "string"},
+          executionResult: {type: "string"},
+          status: {type: "string"},
+          notes: {type: "string"},
         },
         required: ["subtaskDescription", "executionResult", "status"],
       },
     },
-    confidenceScore: { type: "number" },
+    confidenceScore: {type: "number"},
     nextSteps: {
       type: "array",
       items: {
         type: "object",
         properties: {
-          action: { type: "string" },
-          details: { type: "string" },
+          action: {type: "string"},
+          details: {type: "string"},
         },
         required: ["action", "details"],
       },
@@ -91,7 +93,7 @@ const integrationSchema = {
   required: ["isComplete", "summary", "subtaskFeedback", "confidenceScore"],
 };
 
-async function integrateResults({ workflowContext, registry }: IntegrationParams): Promise<IntegrationResult> {
+async function integrateResults({workflowContext, registry}: IntegrationParams): Promise<IntegrationResult> {
   const modelRegistry = registry.requireFirstServiceByType(ModelRegistry);
   const chatService = registry.requireFirstServiceByType(ChatService);
 
@@ -110,7 +112,7 @@ async function integrateResults({ workflowContext, registry }: IntegrationParams
 
     const messages = [
       ...workflowContext.request.messages,
-      { role: "user", content: prompt },
+      {role: "user", content: prompt},
     ];
 
     const [integration] = await client.generateObject(
@@ -129,7 +131,7 @@ async function integrateResults({ workflowContext, registry }: IntegrationParams
 }
 
 export default class IntegrationRunnable extends Runnable {
-  async *invoke(context: IntegrationContext, { registry }: { registry: any }) {
+  async* invoke(context: IntegrationContext, {registry}: { registry: any }) {
     const wfCtx: WorkflowContext = {
       request: context.request,
       plan: context.plan,

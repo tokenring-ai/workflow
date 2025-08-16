@@ -1,7 +1,7 @@
-import {z} from "zod";
 import ModelRegistry from "@token-ring/ai-client/ModelRegistry";
 import ChatService from "@token-ring/chat/ChatService";
 import {Registry} from "@token-ring/registry";
+import {z} from "zod";
 
 
 const loanDecisionSchema = z.object({
@@ -25,6 +25,7 @@ interface LoanApplicationInput {
   monthly_income: number;
   loan_time_in_months?: number;
   name?: string;
+
   [key: string]: any; // Allow for additional properties
 }
 
@@ -40,9 +41,9 @@ const systemPrompt =
  * @returns The loan decision.
  */
 async function process(
-  input: LoanApplicationInput, 
-  workflowContext: Record<string, any>, 
-  registry: Registry, 
+  input: LoanApplicationInput,
+  workflowContext: Record<string, any>,
+  registry: Registry,
   agentConfig: Record<string, any> = {}
 ): Promise<LoanDecision> {
   const chatService = registry.requireFirstServiceByType(ChatService);
@@ -66,7 +67,7 @@ async function process(
 
   try {
     // The input for this agent is the JSON object from the previous agent
-    const messages = [{ role: "user", content: JSON.stringify(input) }];
+    const messages = [{role: "user", content: JSON.stringify(input)}];
 
     const generated = await client.generateObject(
       {

@@ -1,8 +1,8 @@
 import ModelRegistry from "@token-ring/ai-client/ModelRegistry";
 import ChatService from "@token-ring/chat/ChatService";
-import {flow} from "../../../flow.js";
-import {Runnable} from "@token-ring/runnable";
 import {Registry} from "@token-ring/registry";
+import {Runnable} from "@token-ring/runnable";
+import {flow} from "../../../flow.js";
 
 // Define interfaces for the review layer
 interface SubtaskReview {
@@ -21,12 +21,14 @@ interface ReviewResponse {
 interface Subtask {
   description: string;
   rationale: string;
+
   [key: string]: any;
 }
 
 interface ExecutionResult {
   subtask: Subtask;
   response: any;
+
   [key: string]: any;
 }
 
@@ -44,6 +46,7 @@ interface ReviewContext {
   };
   executionResults: ExecutionResult[];
   review?: any;
+
   [key: string]: any;
 }
 
@@ -108,11 +111,11 @@ const reviewResponseSchema = {
  * @returns - The review result
  */
 async function reviewResults({
-  request,
-  decomposition,
-  executionResults,
-  registry,
-}: ReviewParams) {
+                               request,
+                               decomposition,
+                               executionResults,
+                               registry,
+                             }: ReviewParams) {
   const modelRegistry = registry.requireFirstServiceByType(ModelRegistry);
   const chatService = registry.requireFirstServiceByType(ChatService);
 
@@ -154,7 +157,7 @@ REVIEW INSTRUCTIONS:
 
     const newMessages = [
       ...request.messages,
-      { role: "user", content: prompt },
+      {role: "user", content: prompt},
     ];
 
     // Generate object using schema
@@ -183,13 +186,13 @@ REVIEW INSTRUCTIONS:
 }
 
 export default class ReviewRunnable extends Runnable {
-  async *invoke(context: ReviewContext, { registry }: { registry: any }) {
+  async* invoke(context: ReviewContext, {registry}: { registry: any }) {
     const wfCtx = {
       request: context.request,
       decomposition: context.plan.decomposition,
       executionResults: context.executionResults,
     };
-    const result = await reviewResults({ ...wfCtx, registry: registry });
+    const result = await reviewResults({...wfCtx, registry: registry});
     context.review = result;
     yield {
       type: "log",

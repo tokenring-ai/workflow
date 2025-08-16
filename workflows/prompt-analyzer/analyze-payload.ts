@@ -1,35 +1,35 @@
 import ModelRegistry from "@token-ring/ai-client/ModelRegistry";
-
-import {z} from "zod";
 import {Registry} from "@token-ring/registry";
 
+import {z} from "zod";
+
 const outputSchema = z.object({
-	// Temperature between 0.0 and 1.0
-	temperature: z.number().min(0).max(1),
+  // Temperature between 0.0 and 1.0
+  temperature: z.number().min(0).max(1),
 
-	// Top_p between 0.0 and 1.0
-	top_p: z.number().min(0).max(1),
+  // Top_p between 0.0 and 1.0
+  top_p: z.number().min(0).max(1),
 
-	// How much reasoning should be applied (0 = low, 1 = medium, 2 = high, 3 = very high)
-	reasoning: z.number().min(0).max(3).int(),
+  // How much reasoning should be applied (0 = low, 1 = medium, 2 = high, 3 = very high)
+  reasoning: z.number().min(0).max(3).int(),
 
-	// Whether a high-parameter model is needed
-	requiresHighParameterModel: z.boolean(),
+  // Whether a high-parameter model is needed
+  requiresHighParameterModel: z.boolean(),
 
-	// Whether a long context window is needed
-	requiresLongService: z.boolean(),
+  // Whether a long context window is needed
+  requiresLongService: z.boolean(),
 
-	// Specific files needed to complete the request
-	requiresFiles: z.array(z.string()),
+  // Specific files needed to complete the request
+  requiresFiles: z.array(z.string()),
 
-	// File search queries to execute
-	searchFilesFor: z.array(z.string()),
+  // File search queries to execute
+  searchFilesFor: z.array(z.string()),
 
-	// Web search queries to execute
-	searchWebFor: z.array(z.string()),
+  // Web search queries to execute
+  searchWebFor: z.array(z.string()),
 
-	// Whether task is exceptionally complex and needs to be broken down
-	isExceptionallyComplex: z.boolean(),
+  // Whether task is exceptionally complex and needs to be broken down
+  isExceptionallyComplex: z.boolean(),
 });
 
 // Type inferred from the Zod schema
@@ -62,42 +62,42 @@ const systemPrompt = `You are a prompt analyzer, analyzing a prompt that will be
  * @param registry - The package registry
  */
 export default async function analyzePayload(
-  request: ChatRequest, 
+  request: ChatRequest,
   registry: Registry
 ): Promise<AnalysisOutput> {
-	const modelRegistry = registry.requireFirstServiceByType(ModelRegistry);
+  const modelRegistry = registry.requireFirstServiceByType(ModelRegistry);
 
-	let input = request.messages
-		.map(({ role, content }) => `"${role}": "${content}"`)
-		.join(",\n  ");
-	if (input.length > 30000) {
-		input = `${input.slice(0, 2500)}
+  let input = request.messages
+    .map(({role, content}) => `"${role}": "${content}"`)
+    .join(",\n  ");
+  if (input.length > 30000) {
+    input = `${input.slice(0, 2500)}
 --- Chat length was ${input.length} characters, omitting the middle of chat for brevity---
 ${input.slice(-5000)}`;
-	}
+  }
 
-	const client = await modelRegistry.chat.getFirstOnlineClient('auto:reasoning>4');
+  const client = await modelRegistry.chat.getFirstOnlineClient('auto:reasoning>4');
 
-	// Generate object using schema
-	const [output] = await client.generateObject(
-		{
-			messages: [
-				{
-					role: "system",
-					content: systemPrompt,
-				},
-				{
-					role: "user",
-					content: input,
-				},
-			],
-			schema: outputSchema,
-			temperature: 0.0,
-		},
-		registry,
-	);
+  // Generate object using schema
+  const [output] = await client.generateObject(
+    {
+      messages: [
+        {
+          role: "system",
+          content: systemPrompt,
+        },
+        {
+          role: "user",
+          content: input,
+        },
+      ],
+      schema: outputSchema,
+      temperature: 0.0,
+    },
+    registry,
+  );
 
-	return output as AnalysisOutput;
+  return output as AnalysisOutput;
 }
 
 export const execute = analyzePayload;

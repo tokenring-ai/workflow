@@ -1,8 +1,8 @@
 import ModelRegistry from "@token-ring/ai-client/ModelRegistry";
 import ChatService from "@token-ring/chat/ChatService";
-import {flow} from "../../../flow.js";
-import {Runnable} from "@token-ring/runnable";
 import {Registry} from "@token-ring/registry";
+import {Runnable} from "@token-ring/runnable";
+import {flow} from "../../../flow.js";
 
 /**
  * Types for task decomposition
@@ -41,6 +41,7 @@ interface DecomposeContext {
     [key: string]: any;
   };
   plan?: any;
+
   [key: string]: any;
 }
 
@@ -87,7 +88,7 @@ const decompositionSchema = {
           },
           dependsOn: {
             type: "array",
-            items: { type: "string" },
+            items: {type: "string"},
             description:
               "An array of IDs of subtasks from the current decomposition pass that must be completed before this one can start. Optional.",
           },
@@ -158,7 +159,7 @@ async function decomposeTask(workflowContext: WorkflowContext, registry: Registr
 
     const newMessages = [
       ...request.messages,
-      { role: "user", content: prompt },
+      {role: "user", content: prompt},
     ];
 
     // Generate object using schema
@@ -185,10 +186,10 @@ async function decomposeTask(workflowContext: WorkflowContext, registry: Registr
 }
 
 export default class DecomposeRunnable extends Runnable {
-  async *invoke(context: DecomposeContext, { registry }: { registry: any }) {
+  async* invoke(context: DecomposeContext, {registry}: { registry: any }) {
     const wfCtx: WorkflowContext = {
-      sharedData: { discovery: context.request },
-      options: { breadth: context.options?.breadth || 5 },
+      sharedData: {discovery: context.request},
+      options: {breadth: context.options?.breadth || 5},
     };
     const plan = await decomposeTask(wfCtx, registry);
     context.plan = plan;

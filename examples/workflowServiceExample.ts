@@ -13,14 +13,14 @@
  * node -e "import('./core/workflow/examples/workflowServiceExample.js').then(m => m.runWorkflowServiceDemo().catch(console.error))"
  * ```
  */
-import WorkflowService from "../WorkflowService.js";
-import {InMemoryPersistenceProvider} from "../persistenceProvider.js";
+import type {WorkflowContext} from "../../runnable2/runnable.js";
 import {RunnableError} from "../../runnable2/runnableError.js";
 import {RunnableLambda} from "../../runnable2/runnableLambda.js";
 import {RunnableSequence} from "../../runnable2/runnableSequence.js";
-import type {WorkflowContext} from "../../runnable2/runnable.js";
+import {InMemoryPersistenceProvider} from "../persistenceProvider.js";
 import type {BaseWorkflowEvent} from "../workflowEvents.js";
 import type {WorkflowResponse} from "../WorkflowResponse.js";
+import WorkflowService from "../WorkflowService.js";
 
 // --- Define some simple Runnables for the example workflow (now async generators) ---
 
@@ -45,7 +45,7 @@ function createEventBase(
 const step1 = new RunnableLambda(
   async function* (input: number, context?: WorkflowContext) {
     const eventBase = createEventBase(context, this.name);
-    yield { ...eventBase, type: "step_start", input };
+    yield {...eventBase, type: "step_start", input};
     yield {
       ...eventBase,
       type: "log",
@@ -59,11 +59,11 @@ const step1 = new RunnableLambda(
       // For simplicity here, error is caught by base if not handled by wrapper
       throw err;
     }
-    const output = { value: input + 10 };
-    yield { ...eventBase, type: "final_output", data: output };
+    const output = {value: input + 10};
+    yield {...eventBase, type: "final_output", data: output};
     return output;
   },
-  { name: "Step1_AddTen" },
+  {name: "Step1_AddTen"},
 );
 
 interface Step1Output {
@@ -73,7 +73,7 @@ interface Step1Output {
 const step2 = new RunnableLambda(
   async function* (input: Step1Output, context?: WorkflowContext) {
     const eventBase = createEventBase(context, this.name);
-    yield { ...eventBase, type: "step_start", input };
+    yield {...eventBase, type: "step_start", input};
     yield {
       ...eventBase,
       type: "log",
@@ -91,11 +91,11 @@ const step2 = new RunnableLambda(
       };
       throw new RunnableError("Simulated failure in Step2 for value 13");
     }
-    const output = { value: input.value * 2, history: [input.value] };
-    yield { ...eventBase, type: "final_output", data: output };
+    const output = {value: input.value * 2, history: [input.value]};
+    yield {...eventBase, type: "final_output", data: output};
     return output;
   },
-  { name: "Step2_MultiplyByTwo" },
+  {name: "Step2_MultiplyByTwo"},
 );
 
 interface Step2Output {
@@ -106,7 +106,7 @@ interface Step2Output {
 const step3 = new RunnableLambda(
   async function* (input: Step2Output, context?: WorkflowContext) {
     const eventBase = createEventBase(context, this.name);
-    yield { ...eventBase, type: "step_start", input };
+    yield {...eventBase, type: "step_start", input};
     yield {
       ...eventBase,
       type: "log",
@@ -118,10 +118,10 @@ const step3 = new RunnableLambda(
       finalValue: input.value - 5,
       history: [...input.history, input.value],
     };
-    yield { ...eventBase, type: "final_output", data: output };
+    yield {...eventBase, type: "final_output", data: output};
     return output;
   },
-  { name: "Step3_SubtractFive" },
+  {name: "Step3_SubtractFive"},
 );
 
 interface Step3Output {
@@ -147,7 +147,7 @@ export async function runWorkflowServiceDemo(): Promise<void> {
 
   // 1. Setup Services: WorkflowService, PersistenceProvider, and ServiceRegistry
   const persistenceProvider = new InMemoryPersistenceProvider();
-  const wfService = new WorkflowService({ persistenceProvider, debug: true });
+  const wfService = new WorkflowService({persistenceProvider, debug: true});
 
   const mainRegistry = new ServiceRegistry();
   mainRegistry.register(wfService); // Register WorkflowService itself (optional, but good practice)
@@ -226,7 +226,7 @@ export async function runWorkflowServiceDemo(): Promise<void> {
   // 4. Run Workflow - Successful Case
   const initialInputSuccess = 5; // Expected: Step1(15) -> Step2(30) -> Step3(25)
   const contextOverridesSuccess = {
-    userData: { userId: "user-alpha" },
+    userData: {userId: "user-alpha"},
     traceId: "trace-success-001",
   };
   const responseSuccess = wfService.startWorkflow(
@@ -238,7 +238,7 @@ export async function runWorkflowServiceDemo(): Promise<void> {
 
   // 5. Run Workflow - Case that will fail for Resumption Demo
   const initialInputFail = 3; // Expected: Step1(13) -> Step2 (FAILS)
-  const contextOverridesFail = { userData: { userId: "user-beta" } };
+  const contextOverridesFail = {userData: {userId: "user-beta"}};
   let failingInstanceId: string;
 
   const responseFail = wfService.startWorkflow(
@@ -267,7 +267,7 @@ export async function runWorkflowServiceDemo(): Promise<void> {
       "NOTE: Expecting Step2 to fail again on resume with the same input unless state is altered or step logic changes.",
     );
     const contextOverridesResume = {
-      userData: { userId: "user-beta-resumed" },
+      userData: {userId: "user-beta-resumed"},
       traceId: `trace-resume-${failingInstanceId}`,
     };
 
@@ -297,7 +297,7 @@ export async function runWorkflowServiceDemo(): Promise<void> {
         "HACK: Modifying persisted lastOutput for Step2 to be non-failing. Old lastOutput:",
         state.lastOutput,
       );
-      state.lastOutput = { value: 4 }; // Step1 input 3 -> output {value:13}. Now Step2 input {value:4}
+      state.lastOutput = {value: 4}; // Step1 input 3 -> output {value:13}. Now Step2 input {value:4}
       // Expected: Step2({value:4}) -> {value:8, history:[4]}
       // Then Step3({value:8, history:[4]}) -> {finalValue:3, history:[4,8]}
       await persistenceProvider.saveWorkflowState(
@@ -336,4 +336,4 @@ export async function runWorkflowServiceDemo(): Promise<void> {
 // import { runWorkflowServiceDemo } from './path/to/this/file';
 // runWorkflowServiceDemo().catch(err => console.error("TOP LEVEL DEMO ERROR:", err));
 
-export default { runWorkflowServiceDemo };
+export default {runWorkflowServiceDemo};

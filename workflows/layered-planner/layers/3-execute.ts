@@ -1,9 +1,9 @@
 import ModelRegistry from "@token-ring/ai-client/ModelRegistry";
 import ChatService from "@token-ring/chat/ChatService";
+import {Registry} from "@token-ring/registry";
+import {Runnable} from "@token-ring/runnable";
 import {z} from "zod";
 import {flow} from "../../../flow.js";
-import {Runnable} from "@token-ring/runnable";
-import {Registry} from "@token-ring/registry";
 
 // Types for the execute layer
 interface Artifact {
@@ -67,6 +67,7 @@ interface ExecuteContext {
     };
   };
   executionResults?: ExecutionResult[];
+
   [key: string]: any;
 }
 
@@ -136,7 +137,7 @@ const executionResponseSchema = z
  * @param registry - The package registry.
  * @returns - The execution result.
  */
-async function executeSubtask({ workflowContext, subtask, registry }: ExecuteParams): Promise<ExecutionResult> {
+async function executeSubtask({workflowContext, subtask, registry}: ExecuteParams): Promise<ExecutionResult> {
   const modelRegistry = registry.requireFirstServiceByType(ModelRegistry);
   const chatService = registry.requireFirstServiceByType(ChatService);
 
@@ -198,7 +199,7 @@ ${JSON.stringify(executionResponseSchema, null, 2)}
 
     const newMessages = [
       ...request.messages,
-      { role: "user", content: prompt },
+      {role: "user", content: prompt},
     ];
 
     // Generate object using schema
@@ -216,7 +217,7 @@ ${JSON.stringify(executionResponseSchema, null, 2)}
 
     // Parse the response, handling different response formats and undefined cases
     let structuredResult: ExecutionResponse;
-    
+
     if (!response) {
       // Handle undefined response
       structuredResult = {
@@ -226,18 +227,18 @@ ${JSON.stringify(executionResponseSchema, null, 2)}
         toolInvocations: []
       };
     } else {
-        { // Handle case where response is a string
-            try {
-                structuredResult = JSON.parse(response);
-            } catch (e) {
-                structuredResult = {
-                    result: response,
-                    isSuccessful: false,
-                    artifacts: [],
-                    toolInvocations: []
-                };
-            }
+      { // Handle case where response is a string
+        try {
+          structuredResult = JSON.parse(response);
+        } catch (e) {
+          structuredResult = {
+            result: response,
+            isSuccessful: false,
+            artifacts: [],
+            toolInvocations: []
+          };
         }
+      }
     }
 
     // Validate the structuredResult against the schema if possible (optional, depends on Zod usage)
@@ -253,10 +254,10 @@ ${JSON.stringify(executionResponseSchema, null, 2)}
 }
 
 export default class ExecuteRunnable extends Runnable {
-  async *invoke(context: ExecuteContext, { registry }: { registry: any }) {
+  async* invoke(context: ExecuteContext, {registry}: { registry: any }) {
     const results: ExecutionResult[] = [];
     for (const subtask of context.plan.decomposition.subtasks) {
-      const wfCtx: WorkflowContext = { sharedData: { discovery: context.request } };
+      const wfCtx: WorkflowContext = {sharedData: {discovery: context.request}};
       const res = await executeSubtask({
         workflowContext: wfCtx,
         subtask,

@@ -1,6 +1,6 @@
-import {z} from "zod";
 import ModelRegistry from "@token-ring/ai-client/ModelRegistry";
 import ChatService from "@token-ring/chat/ChatService";
+import {z} from "zod";
 
 
 const TranslationItem = z.object({
@@ -42,11 +42,13 @@ interface TranslationOutput {
 interface WorkerResult {
   id: string;
   output: TranslationOutput;
+
   [key: string]: any;
 }
 
 interface AgentConfig {
   originalText: string;
+
   [key: string]: any;
 }
 
@@ -64,10 +66,10 @@ const systemPrompt =
  * @returns The structured aggregation of translations.
  */
 async function process(
-  input: WorkerResult[], 
-  workflowContext: Record<string, any>, 
-  registry: Registry, 
-  agentConfig: AgentConfig = { originalText: '' }
+  input: WorkerResult[],
+  workflowContext: Record<string, any>,
+  registry: Registry,
+  agentConfig: AgentConfig = {originalText: ''}
 ): Promise<AggregatedOutput> {
   const chatService = registry.requireFirstServiceByType(ChatService);
   const modelRegistry = registry.requireFirstServiceByType(ModelRegistry);
@@ -110,7 +112,7 @@ async function process(
   });
 
   try {
-    const messages = [{ role: "user", content: userContent }];
+    const messages = [{role: "user", content: userContent}];
 
     const generated = await client.generateObject(
       {

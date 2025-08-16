@@ -5,6 +5,7 @@ import ChatService from "@token-ring/chat/ChatService";
 
 interface InputType {
   customerQuery: string;
+
   [key: string]: any; // For other potential data from router output
 }
 
@@ -29,64 +30,64 @@ interface AgentConfig {
  * @returns - An object containing the agent's text response.
  */
 async function process(
-  input: InputType, 
-  workflowContext: any, 
-  registry: Registry, 
+  input: InputType,
+  workflowContext: any,
+  registry: Registry,
   agentConfig: AgentConfig = {}
 ): Promise<OutputType> {
-	const chatService = registry.requireFirstServiceByType(ChatService);
-	const modelRegistry = registry.requireFirstServiceByType(ModelRegistry);
+  const chatService = registry.requireFirstServiceByType(ChatService);
+  const modelRegistry = registry.requireFirstServiceByType(ModelRegistry);
 
-	const specialistType = agentConfig.specialistType || "general"; // Default if not provided
-	chatService.systemLine(
-		`[GenericSpecialistAgent:${specialistType}] Starting response...`,
-	);
+  const specialistType = agentConfig.specialistType || "general"; // Default if not provided
+  chatService.systemLine(
+    `[GenericSpecialistAgent:${specialistType}] Starting response...`,
+  );
 
-	if (!input || false) {
-		throw new Error(
-			'Input must be an object with a "customerQuery" string property.',
-		);
-	}
+  if (!input || false) {
+    throw new Error(
+      'Input must be an object with a "customerQuery" string property.',
+    );
+  }
 
-	const systemPrompt =
-		agentConfig.systemPrompt ||
-		`You are a ${specialistType} specialist. Please address the following customer query comprehensively and clearly.`;
+  const systemPrompt =
+    agentConfig.systemPrompt ||
+    `You are a ${specialistType} specialist. Please address the following customer query comprehensively and clearly.`;
 
-	const client = await modelRegistry.getFirstOnlineClient({
-		tags: ["support", specialistType],
-	});
+  const client = await modelRegistry.getFirstOnlineClient({
+    tags: ["support", specialistType],
+  });
 
-	try {
-		// Construct messages for generateText
-		// If router output was passed and merged, it might be in `input` if needed for context here.
-		// For this example, we'll primarily use the customerQuery.
-		const messages = [
-			{ role: "system", content: systemPrompt },
-			{ role: "user", content: input.customerQuery },
-		];
+  try {
+    // Construct messages for generateText
+    // If router output was passed and merged, it might be in `input` if needed for context here.
+    // For this example, we'll primarily use the customerQuery.
+    const messages = [
+      {role: "system", content: systemPrompt},
+      {role: "user", content: input.customerQuery},
+    ];
 
-		// Using generateText as specified
-		const generated = await client.generateText(
-			{
-				messages,
-				temperature: 0.5, // Allow for more conversational responses
-			},
-			registry,
-		);
+    // Using generateText as specified
+    const generated = await client.generateText(
+      {
+        messages,
+        temperature: 0.5, // Allow for more conversational responses
+      },
+      registry,
+    );
 
-		const responseText = generated.text;
+    const responseText = generated.text;
 
-		chatService.systemLine(
-			`[GenericSpecialistAgent:${specialistType}] Generated response of length ${responseText.length}.`,
-		);
-		return { response: responseText };
-	} catch (error: any) {
-		chatService.errorLine(
-			`[GenericSpecialistAgent:${specialistType}] Error during text generation: ${error.message}`,
-		);
-		console.error(error);
-		throw error;
-	}
+    chatService.systemLine(
+      `[GenericSpecialistAgent:${specialistType}] Generated response of length ${responseText.length}.`,
+    );
+    return {response: responseText};
+  } catch (error: any) {
+    chatService.errorLine(
+      `[GenericSpecialistAgent:${specialistType}] Error during text generation: ${error.message}`,
+    );
+    console.error(error);
+    throw error;
+  }
 }
 
 export default process;

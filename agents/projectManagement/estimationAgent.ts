@@ -1,7 +1,7 @@
-import {z} from "zod";
 import ModelRegistry from "@token-ring/ai-client/ModelRegistry";
 import ChatService from "@token-ring/chat/ChatService";
 import {Registry} from "@token-ring/registry";
+import {z} from "zod";
 
 
 const estimationSchema = z.object({
@@ -21,12 +21,14 @@ interface TaskInput {
   taskId: string;
   taskDescription: string;
   additionalData?: Record<string, any>;
+
   [key: string]: any;
 }
 
 interface AgentConfig {
   baseSystemPrompt?: string;
   roleSpecificPrompt?: string;
+
   [key: string]: any;
 }
 
@@ -40,9 +42,9 @@ interface AgentConfig {
  * @returns The estimation object.
  */
 async function process(
-  input: TaskInput, 
-  workflowContext: Record<string, any>, 
-  registry: Registry, 
+  input: TaskInput,
+  workflowContext: Record<string, any>,
+  registry: Registry,
   agentConfig: AgentConfig = {}
 ): Promise<EstimationResult> {
   const chatService = registry.requireFirstServiceByType(ChatService);
@@ -80,7 +82,7 @@ async function process(
       // If TechLeadAgent provided more context
       userMessageContent += `\nAdditional Context: ${JSON.stringify(input.additionalData)}`;
     }
-    const messages = [{ role: "user", content: userMessageContent }];
+    const messages = [{role: "user", content: userMessageContent}];
 
     const generated = await client.generateObject(
       {

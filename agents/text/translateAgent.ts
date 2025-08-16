@@ -41,7 +41,7 @@ export class TranslateAgent extends Runnable<TranslateAgentInput, TranslateAgent
       name: `TranslateAgent (to ${agentConfig.targetLanguage || 'unknown'})`,
       ...runnableOpts
     });
-    
+
     this.agentConfig = {
       sourceLanguage: "English", // Default source language
       ...agentConfig,
@@ -60,16 +60,16 @@ export class TranslateAgent extends Runnable<TranslateAgentInput, TranslateAgent
    * @param context - The context containing registry.
    * @returns An object containing the translated text and target language.
    */
-  async *invoke(input: TranslateAgentInput, context?: any): AsyncGenerator<any, TranslateAgentOutput, void> {
+  async* invoke(input: TranslateAgentInput, context?: any): AsyncGenerator<any, TranslateAgentOutput, void> {
     if (!input || false) {
-      yield { 
-        type: 'log', 
-        level: 'error', 
+      yield {
+        type: 'log',
+        level: 'error',
         message: 'TranslateAgent: Input must be an object with a "textToTranslate" string property.',
         timestamp: Date.now(),
         runnableName: this.name
       };
-      
+
       throw new Error(
         'TranslateAgent: Input must be an object with a "textToTranslate" string property.',
       );
@@ -77,14 +77,14 @@ export class TranslateAgent extends Runnable<TranslateAgentInput, TranslateAgent
 
     const registry = context?.registry;
     if (!registry) {
-      yield { 
-        type: 'log', 
-        level: 'error', 
+      yield {
+        type: 'log',
+        level: 'error',
         message: 'TranslateAgent: registry not found in context.',
         timestamp: Date.now(),
         runnableName: this.name
       };
-      
+
       throw new Error(
         "TranslateAgent: registry not found in context.",
       );
@@ -93,12 +93,12 @@ export class TranslateAgent extends Runnable<TranslateAgentInput, TranslateAgent
     const chatService = registry.requireFirstServiceByType(ChatService);
     const modelRegistry = registry.requireFirstServiceByType(ModelRegistry);
 
-    const { targetLanguage, sourceLanguage } = this.agentConfig;
+    const {targetLanguage, sourceLanguage} = this.agentConfig;
 
     // Yield log event instead of using this.log
-    yield { 
-      type: 'log', 
-      level: 'info', 
+    yield {
+      type: 'log',
+      level: 'info',
       message: `Starting translation of text from ${sourceLanguage} to ${targetLanguage}. Text: "${input.textToTranslate.substring(0, 50)}..."`,
       timestamp: Date.now(),
       runnableName: this.name
@@ -110,7 +110,7 @@ export class TranslateAgent extends Runnable<TranslateAgentInput, TranslateAgent
       // Get a model client with appropriate tags
       const client = await modelRegistry.chat.getFirstOnlineClient('auto');
 
-      const messages = [{ role: "user", content: input.textToTranslate }];
+      const messages = [{role: "user", content: input.textToTranslate}];
 
       const generated = await client.generateText(
         {
@@ -123,27 +123,27 @@ export class TranslateAgent extends Runnable<TranslateAgentInput, TranslateAgent
 
       const translatedText = generated.text;
 
-      yield { 
-        type: 'log', 
-        level: 'info', 
+      yield {
+        type: 'log',
+        level: 'info',
         message: `Successfully translated text to ${targetLanguage}.`,
         timestamp: Date.now(),
         runnableName: this.name
       };
-      
-      return { translatedText, language: targetLanguage };
+
+      return {translatedText, language: targetLanguage};
     } catch (err) {
       const error = err as Error;
-      
-      yield { 
-        type: 'log', 
-        level: 'error', 
+
+      yield {
+        type: 'log',
+        level: 'error',
         message: `Error during translation to ${targetLanguage}: ${error.message}`,
         timestamp: Date.now(),
         runnableName: this.name,
         error
       };
-      
+
       // Re-throw the error to be handled by Runnable's retry/fallback mechanisms or calling workflow
       throw err;
     }

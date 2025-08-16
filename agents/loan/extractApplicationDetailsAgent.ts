@@ -1,7 +1,7 @@
-import {z} from "zod";
 import ModelRegistry from "@token-ring/ai-client/ModelRegistry";
 import ChatService from "@token-ring/chat/ChatService";
 import {Registry} from "@token-ring/registry";
+import {z} from "zod";
 
 
 const applicationDetailsSchema = z.object({
@@ -38,9 +38,9 @@ const systemPrompt =
  * @returns The structured loan application details.
  */
 async function process(
-  input: AgentInput, 
-  workflowContext: Record<string, any>, 
-  registry: Registry, 
+  input: AgentInput,
+  workflowContext: Record<string, any>,
+  registry: Registry,
   agentConfig: Record<string, any> = {}
 ): Promise<ApplicationDetails> {
   const chatService = registry.requireFirstServiceByType(ChatService);
@@ -61,7 +61,7 @@ async function process(
   }); // Example tags
 
   try {
-    const messages = [{ role: "user", content: input.conversation }];
+    const messages = [{role: "user", content: input.conversation}];
 
     // Using generateObject to get structured output
     const generated = await client.generateObject(

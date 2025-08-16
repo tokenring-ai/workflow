@@ -103,7 +103,7 @@ const layers: Layer[] = [
     width: 5,
     temperature: 0.2,
     promptGuidelines: `Identify the project's scope, stakeholders, and high-level objectives.`,
-    schema: z.object({ id: z.string(), description: z.string() }),
+    schema: z.object({id: z.string(), description: z.string()}),
   },
   {
     name: "context_gathering",
@@ -285,4 +285,4 @@ const layers: Layer[] = [
   },
 ];
 
-export { layers, Layer };
+export {layers, Layer};

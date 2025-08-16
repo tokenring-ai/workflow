@@ -1,11 +1,11 @@
+import {createChatRequest} from "@token-ring/ai-client";
+import {ChatInputMessage, ChatRequest} from "@token-ring/ai-client/client/AIChatClient";
 import ModelRegistry from "@token-ring/ai-client/ModelRegistry";
 import ChatService from "@token-ring/chat/ChatService";
 import FileSystemService from "@token-ring/filesystem/FileSystemService";
-import {createChatRequest} from "@token-ring/ai-client";
-import {flow} from "../../../flow.js";
-import {Runnable} from "@token-ring/runnable";
-import {ChatInputMessage, ChatRequest} from "@token-ring/ai-client/client/AIChatClient";
 import {Registry} from "@token-ring/registry";
+import {Runnable} from "@token-ring/runnable";
+import {flow} from "../../../flow.js";
 
 interface AnalysisSchema {
   requiresFiles: string[];
@@ -17,6 +17,7 @@ interface AnalysisSchema {
 interface DiscoveryContext {
   prompt: string;
   request?: ChatRequest;
+
   [key: string]: any;
 }
 
@@ -27,7 +28,7 @@ interface DiscoveryParams {
 
 interface FileSearchResult {
   file: string;
-  line: number; 
+  line: number;
   match: string;
 }
 
@@ -81,19 +82,19 @@ const discoverySystemPrompt = `You are a prompt analyzer, analyzing a prompt tha
  * @param params.originalPrompt - The initial user prompt.
  * @param registry - The package registry
  */
-async function contextDiscovery({ originalPrompt }: DiscoveryParams, registry: Registry): Promise<ChatRequest> {
+async function contextDiscovery({originalPrompt}: DiscoveryParams, registry: Registry): Promise<ChatRequest> {
   const modelRegistry = registry.requireFirstServiceByType(ModelRegistry);
   const chatService = registry.requireFirstServiceByType(ChatService);
   const filesystem = registry.requireFirstServiceByType(FileSystemService);
 
   const systemPrompt = chatService.getInstructions();
   const request = await createChatRequest(
-    { input: originalPrompt, systemPrompt },
+    {input: originalPrompt, systemPrompt},
     registry,
   );
 
   let input = request.messages
-    .map(({ role, content }) => `"${role}": "${content}"`)
+    .map(({role, content}) => `"${role}": "${content}"`)
     .join(",\n  ");
   if (input.length > 30000) {
     input = `${input.slice(0, 2500)}
@@ -179,9 +180,11 @@ ${input.slice(-5000)}`;
 }
 
 export default class DiscoveryRunnable extends Runnable {
-  async *invoke(context: DiscoveryContext, { registry }: { registry: Registry }): AsyncGenerator<any, DiscoveryContext, unknown> {
+  async* invoke(context: DiscoveryContext, {registry}: {
+    registry: Registry
+  }): AsyncGenerator<any, DiscoveryContext, unknown> {
     const request = await contextDiscovery(
-      { originalPrompt: context.prompt },
+      {originalPrompt: context.prompt},
       registry,
     );
     context.request = request;

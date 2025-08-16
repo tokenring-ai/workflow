@@ -1,7 +1,7 @@
-import {z} from "zod";
 import ModelRegistry from "@token-ring/ai-client/ModelRegistry";
 import ChatService from "@token-ring/chat/ChatService";
 import {Registry} from "@token-ring/registry";
+import {z} from "zod";
 
 
 const individualEstimationSchema = z.object({
@@ -90,9 +90,9 @@ const systemPrompt =
  * @returns The scrum master's report.
  */
 async function process(
-  input: AgentInput, 
-  workflowContext: Record<string, any>, 
-  registry: Registry, 
+  input: AgentInput,
+  workflowContext: Record<string, any>,
+  registry: Registry,
   agentConfig: Record<string, any> = {}
 ): Promise<ScrumMasterReport> {
   const chatService = registry.requireFirstServiceByType(ChatService);
@@ -150,11 +150,11 @@ ${input.orchestratorTasks.map((task) => `- ${task.role} (ID: ${task.taskId}): ${
 
 Individual Estimations from Team:
 ${formattedEstimations
-  .map(
-    (est) =>
-      `- Role: ${est.role}, Task ID: ${est.taskId}\n  Task: ${est.task}\n  Status: ${est.status}\n  Estimate: ${est.estimate} man-days\n  Reasoning: ${est.reasoning}${est.error ? `\n  Error: ${est.error}` : ""}`,
-  )
-  .join("\n---\n")}
+    .map(
+      (est) =>
+        `- Role: ${est.role}, Task ID: ${est.taskId}\n  Task: ${est.task}\n  Status: ${est.status}\n  Estimate: ${est.estimate} man-days\n  Reasoning: ${est.reasoning}${est.error ? `\n  Error: ${est.error}` : ""}`,
+    )
+    .join("\n---\n")}
 
 Please generate the summary report based on these details. Calculate the total_estimated_man_days by summing valid estimates.
 The 'individual_estimations' field in your JSON output should be an array of objects, each containing: role, taskId, task, estimate, reasoning, status, and error (if any).
@@ -165,7 +165,7 @@ The 'individual_estimations' field in your JSON output should be an array of obj
   });
 
   try {
-    const messages = [{ role: "user", content: userMessageContent }];
+    const messages = [{role: "user", content: userMessageContent}];
 
     const generated = await client.generateObject(
       {

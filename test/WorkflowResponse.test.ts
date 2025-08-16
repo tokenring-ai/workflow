@@ -1,6 +1,6 @@
 import {describe, expect, it} from "vitest";
-import {WorkflowResponse} from "../WorkflowResponse.js";
 import {BaseWorkflowEvent, WorkflowEvent, WorkflowResponseType} from "../workflowEvents.js";
+import {WorkflowResponse} from "../WorkflowResponse.js";
 
 // Helper to create a mock async generator
 async function* mockAsyncGenerator<T = any>(
@@ -48,22 +48,22 @@ describe("WorkflowResponse", () => {
         {
           ...baseEventProps("Step1"),
           type: "step_start",
-          input: { data: "start" },
+          input: {data: "start"},
         },
         {
           ...baseEventProps("Step1"),
           type: "final_output",
-          data: { result: "done" },
+          data: {result: "done"},
         },
         {
           ...baseEventProps("Step1"),
           type: "step_end",
-          output: { result: "done" },
+          output: {result: "done"},
           durationMs: 10,
         },
       ] as WorkflowEvent[];
-      
-      const generator = mockAsyncGenerator(events, { result: "done" });
+
+      const generator = mockAsyncGenerator(events, {result: "done"});
       const response = new WorkflowResponse(generator);
 
       const collectedEvents: WorkflowEvent[] = [];
@@ -75,16 +75,16 @@ describe("WorkflowResponse", () => {
         "final_output",
         "step_end",
       ]);
-      expect((collectedEvents[1] as any).data).toEqual({ result: "done" });
+      expect((collectedEvents[1] as any).data).toEqual({result: "done"});
     });
 
     it("should allow multiple iterations by buffering events (replayability)", async () => {
       const events = [
-        { ...baseEventProps("S1"), type: "step_start", input: "a" },
-        { ...baseEventProps("S1"), type: "final_output", data: "b" },
-        { ...baseEventProps("S1"), type: "step_end", output: "b" },
+        {...baseEventProps("S1"), type: "step_start", input: "a"},
+        {...baseEventProps("S1"), type: "final_output", data: "b"},
+        {...baseEventProps("S1"), type: "step_end", output: "b"},
       ] as WorkflowEvent[];
-      
+
       const generator = mockAsyncGenerator(events, "b");
       const response = new WorkflowResponse(generator);
 
@@ -111,9 +111,9 @@ describe("WorkflowResponse", () => {
     it("should handle errors from the underlying generator and yield a workflow_error event", async () => {
       const error = new Error("Generator failed!");
       const events = [
-        { ...baseEventProps("E1"), type: "step_start", input: "test" },
+        {...baseEventProps("E1"), type: "step_start", input: "test"},
       ] as WorkflowEvent[];
-      
+
       const generator = mockAsyncGenerator(events, undefined, error);
       const response = new WorkflowResponse(generator, {
         runnableName: "ErrorWorkflow",
@@ -141,30 +141,30 @@ describe("WorkflowResponse", () => {
   describe("response()", () => {
     it("should resolve with data from the final_output event", async () => {
       const events = [
-        { ...baseEventProps("R"), type: "step_start" },
-        { ...baseEventProps("R"), type: "output_chunk", data: "chunk1" },
+        {...baseEventProps("R"), type: "step_start"},
+        {...baseEventProps("R"), type: "output_chunk", data: "chunk1"},
         {
           ...baseEventProps("R"),
           type: "final_output",
-          data: { final: "result" },
+          data: {final: "result"},
         },
         {
           ...baseEventProps("R"),
           type: "step_end",
-          output: { final: "result" },
+          output: {final: "result"},
         },
       ] as WorkflowEvent[];
-      
-      const generator = mockAsyncGenerator(events, { final: "result" });
+
+      const generator = mockAsyncGenerator(events, {final: "result"});
       const response = new WorkflowResponse(generator);
-      await expect(response.response()).resolves.toEqual({ final: "result" });
+      await expect(response.response()).resolves.toEqual({final: "result"});
     });
 
     it("should cache the response promise", async () => {
       const events = [
-        { ...baseEventProps("C"), type: "final_output", data: "cached" },
+        {...baseEventProps("C"), type: "final_output", data: "cached"},
       ] as WorkflowEvent[];
-      
+
       const generator = mockAsyncGenerator(events, "cached");
       const response = new WorkflowResponse(generator);
 
@@ -180,8 +180,8 @@ describe("WorkflowResponse", () => {
 
     it("should reject if the stream errors before a final_output event", async () => {
       const error = new Error("Stream error before output");
-      const events = [{ ...baseEventProps("E"), type: "step_start" }] as WorkflowEvent[];
-      
+      const events = [{...baseEventProps("E"), type: "step_start"}] as WorkflowEvent[];
+
       const generator = mockAsyncGenerator(events, undefined, error);
       const response = new WorkflowResponse(generator);
       await expect(response.response()).rejects.toThrow(
@@ -191,21 +191,21 @@ describe("WorkflowResponse", () => {
 
     it("should resolve with generator TReturn if no final_output event is yielded", async () => {
       const events = [
-        { ...baseEventProps("TR"), type: "step_start" },
+        {...baseEventProps("TR"), type: "step_start"},
         {
           ...baseEventProps("TR"),
           type: "step_end",
-          output: { value: "from return" },
+          output: {value: "from return"},
         }, // output here is from TReturn
       ] as WorkflowEvent[];
-      
-      const generator = mockAsyncGenerator(events, { value: "from return" });
+
+      const generator = mockAsyncGenerator(events, {value: "from return"});
       const wfResponse = new WorkflowResponse(generator);
       // Manually set _generatorReturnValue as the mockAsyncGenerator doesn't perfectly simulate TReturn capture by WorkflowResponse._consumeFullGeneratorInternal
       // In a real scenario, _consumeFullGeneratorInternal would capture this.
       // For this test, we simulate that it was captured.
       await wfResponse.allEvents(); // Consume the stream
-      (wfResponse as any)._generatorReturnValue = { value: "from return" }; // Simulate TReturn capture
+      (wfResponse as any)._generatorReturnValue = {value: "from return"}; // Simulate TReturn capture
 
       await expect(wfResponse.response()).resolves.toEqual({
         value: "from return",
@@ -217,13 +217,13 @@ describe("WorkflowResponse", () => {
     it("should resolve with data from the schema_definition event", async () => {
       const schema = {
         type: "object",
-        properties: { name: { type: "string" } },
+        properties: {name: {type: "string"}},
       };
       const events = [
-        { ...baseEventProps("S"), type: "schema_definition", schema },
-        { ...baseEventProps("S"), type: "final_output", data: "done" },
+        {...baseEventProps("S"), type: "schema_definition", schema},
+        {...baseEventProps("S"), type: "final_output", data: "done"},
       ] as WorkflowEvent[];
-      
+
       const generator = mockAsyncGenerator(events);
       const response = new WorkflowResponse(generator);
       await expect(response.outputSchema()).resolves.toEqual(schema);
@@ -231,20 +231,20 @@ describe("WorkflowResponse", () => {
 
     it("should resolve undefined if no schema_definition event is found", async () => {
       const events = [
-        { ...baseEventProps("S"), type: "final_output", data: "done" },
+        {...baseEventProps("S"), type: "final_output", data: "done"},
       ] as WorkflowEvent[];
-      
+
       const generator = mockAsyncGenerator(events);
       const response = new WorkflowResponse(generator);
       await expect(response.outputSchema()).resolves.toBeUndefined();
     });
 
     it("should cache the schema promise", async () => {
-      const schema = { type: "object" };
+      const schema = {type: "object"};
       const events = [
-        { ...baseEventProps("SC"), type: "schema_definition", schema },
+        {...baseEventProps("SC"), type: "schema_definition", schema},
       ] as WorkflowEvent[];
-      
+
       const generator = mockAsyncGenerator(events);
       const response = new WorkflowResponse(generator);
 
@@ -257,8 +257,8 @@ describe("WorkflowResponse", () => {
 
     it("should reject if stream errors before schema or if no schema found and stream errored", async () => {
       const error = new Error("Schema stream error");
-      const events = [{ ...baseEventProps("SE"), type: "step_start" }] as WorkflowEvent[];
-      
+      const events = [{...baseEventProps("SE"), type: "step_start"}] as WorkflowEvent[];
+
       const generator = mockAsyncGenerator(events, undefined, error);
       const response = new WorkflowResponse(generator);
       await expect(response.outputSchema()).rejects.toThrow(
@@ -270,17 +270,17 @@ describe("WorkflowResponse", () => {
   describe("allEvents()", () => {
     it("should collect all events from the stream", async () => {
       const events = [
-        { ...baseEventProps("A"), type: "step_start" },
+        {...baseEventProps("A"), type: "step_start"},
         {
           ...baseEventProps("A"),
           type: "log",
           level: "info",
           message: "hello",
         },
-        { ...baseEventProps("A"), type: "final_output", data: "world" },
-        { ...baseEventProps("A"), type: "step_end", output: "world" },
+        {...baseEventProps("A"), type: "final_output", data: "world"},
+        {...baseEventProps("A"), type: "step_end", output: "world"},
       ] as WorkflowEvent[];
-      
+
       const generator = mockAsyncGenerator(events);
       const response = new WorkflowResponse(generator);
       const collected = await response.allEvents();
@@ -294,8 +294,8 @@ describe("WorkflowResponse", () => {
     });
 
     it("should return buffered events even if called multiple times", async () => {
-      const events = [{ ...baseEventProps("B"), type: "step_start" }] as WorkflowEvent[];
-      
+      const events = [{...baseEventProps("B"), type: "step_start"}] as WorkflowEvent[];
+
       const generator = mockAsyncGenerator(events);
       const response = new WorkflowResponse(generator);
       await response.allEvents();
@@ -306,8 +306,8 @@ describe("WorkflowResponse", () => {
 
     it("should include error event if stream fails", async () => {
       const error = new Error("Failed during allEvents");
-      const events = [{ ...baseEventProps("AE"), type: "step_start" }] as WorkflowEvent[];
-      
+      const events = [{...baseEventProps("AE"), type: "step_start"}] as WorkflowEvent[];
+
       const generator = mockAsyncGenerator(events, undefined, error);
       const response = new WorkflowResponse(generator);
 
@@ -335,12 +335,12 @@ describe("WorkflowResponse", () => {
   describe("Interactions between methods", () => {
     it("should allow calling response() after partially consuming stream()", async () => {
       const events = [
-        { ...baseEventProps("Mix"), type: "step_start", input: "test" },
-        { ...baseEventProps("Mix"), type: "output_chunk", data: "partial" },
-        { ...baseEventProps("Mix"), type: "final_output", data: "final" },
-        { ...baseEventProps("Mix"), type: "step_end", output: "final" },
+        {...baseEventProps("Mix"), type: "step_start", input: "test"},
+        {...baseEventProps("Mix"), type: "output_chunk", data: "partial"},
+        {...baseEventProps("Mix"), type: "final_output", data: "final"},
+        {...baseEventProps("Mix"), type: "step_end", output: "final"},
       ] as WorkflowEvent[];
-      
+
       const generator = mockAsyncGenerator(events, "final");
       const response = new WorkflowResponse(generator);
 

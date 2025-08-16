@@ -1,7 +1,7 @@
-import {z} from "zod";
 import ModelRegistry from "@token-ring/ai-client/ModelRegistry";
 import ChatService from "@token-ring/chat/ChatService";
 import {Registry} from "@token-ring/registry";
+import {z} from "zod";
 
 
 const taskSchema = z.object({
@@ -35,9 +35,9 @@ const systemPrompt =
  * @returns An array of task objects.
  */
 async function process(
-  input: AgentInput, 
-  workflowContext: Record<string, any>, 
-  registry: Registry, 
+  input: AgentInput,
+  workflowContext: Record<string, any>,
+  registry: Registry,
   agentConfig: Record<string, any> = {}
 ): Promise<TechLeadOutput> {
   const chatService = registry.requireFirstServiceByType(ChatService);
@@ -57,7 +57,7 @@ async function process(
 
   try {
     const messages = [
-      { role: "user", content: `Feature Request: ${input.featureRequest}` },
+      {role: "user", content: `Feature Request: ${input.featureRequest}`},
     ];
 
     const generated = await client.generateObject(

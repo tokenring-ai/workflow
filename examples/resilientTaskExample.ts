@@ -26,12 +26,14 @@ import {Runnable, RunnableOptions} from "@token-ring/runnable";
 // Define interfaces for input and output
 interface ServiceInput {
   id: string;
+
   [key: string]: any;
 }
 
 interface ServiceOutput {
   data: string;
   source: string;
+
   [key: string]: any;
 }
 
@@ -236,7 +238,7 @@ export function createResilientTaskRunnable(): Runnable {
       );
       return fallbackServiceCall(input);
     },
-    { name: "FallbackServiceTask_1" },
+    {name: "FallbackServiceTask_1"},
   );
 
   const criticalFallbackTask = new RunnableLambda(
@@ -248,7 +250,7 @@ export function createResilientTaskRunnable(): Runnable {
       );
       return criticalFallbackServiceCall(input);
     },
-    { name: "CriticalFallbackServiceTask" },
+    {name: "CriticalFallbackServiceTask"},
   );
 
   // Compose with fallbacks. Note: withFallbacks expects an array of runnables.
@@ -309,7 +311,7 @@ export async function runErrorHandlingDemo(): Promise<void> {
       // the withRetry mechanism handles that by re-calling invoke on the *same* instance.
       // The internal `this.attempts` in PrimaryServiceRunnable will thus correctly track attempts for a single `invoke` sequence (including retries).
 
-      const result = await taskForTestCase.invoke({ id: testCase.id }, exampleContext);
+      const result = await taskForTestCase.invoke({id: testCase.id}, exampleContext);
       console.log(
         `SUCCESS Case "${testCase.description}":`,
         JSON.stringify(result, null, 2),
@@ -328,4 +330,4 @@ export async function runErrorHandlingDemo(): Promise<void> {
 // To run this example, you might import and call runErrorHandlingDemo() from another file,
 // or use a simple runner script if this were a standalone package.
 // e.g. runErrorHandlingDemo();
-export default { createResilientTaskRunnable, runErrorHandlingDemo };
+export default {createResilientTaskRunnable, runErrorHandlingDemo};
