@@ -28,7 +28,8 @@ type Evaluation = z.infer<typeof evaluationSchema>;
 interface InputType {
   articleText: string;
 
-  [key: string]: any;
+  // Allow additional properties of unknown type
+  [key: string]: unknown;
 }
 
 interface WorkflowContext {
@@ -37,26 +38,21 @@ interface WorkflowContext {
     topic?: string;
   };
 
-  [key: string]: any;
+  // Allow additional properties of unknown type
+  [key: string]: unknown;
 }
 
 interface AgentConfig {
   constraint?: string;
   topic?: string;
 
-  [key: string]: any;
+  // Allow additional properties of unknown type
+  [key: string]: unknown;
 }
 
 /**
  * Agent to evaluate an article and provide feedback.
- * @param input - Expected to be the output of ArticleWriterAgent,
  *                e.g., { articleText: "..." }.
- * @param workflowContext - Shared workflow context. (Potentially contains originalTask for reference)
- * @param registry - Service registry.
- * @param agentConfig - Agent-specific configuration.
- * @param [agentConfig.constraint] - The constraint the article should adhere to.
- * @param [agentConfig.topic] - The original topic of the article.
- * @returns - The evaluation object.
  */
 async function process(
   input: InputType,
@@ -71,7 +67,7 @@ async function process(
     "[ArticleSupervisorAgent] Starting article evaluation...",
   );
 
-  if (!input || false) {
+  if (!input) {
     throw new Error(
       'Input must be an object with an "articleText" string property.',
     );
@@ -118,9 +114,13 @@ async function process(
       `[ArticleSupervisorAgent] Evaluation completed. Satisfied: ${evaluation.satisfied}. Feedback: ${evaluation.feedback.substring(0, 100)}...`,
     );
     return evaluation;
-  } catch (error: any) {
+  } catch (error: unknown) {
+    let message = "Unknown error";
+    if (error instanceof Error) {
+      message = error.message;
+    }
     chatService.errorLine(
-      `[ArticleSupervisorAgent] Error during article evaluation: ${error.message}`,
+      `[ArticleSupervisorAgent] Error during article evaluation: ${message}`,
     );
     console.error(error);
     throw error;

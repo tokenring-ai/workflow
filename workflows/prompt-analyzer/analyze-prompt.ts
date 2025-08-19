@@ -1,5 +1,4 @@
 import {createChatRequest} from "@token-ring/ai-client";
-import {ChatInputMessage} from "@token-ring/ai-client/client/AIChatClient";
 import {ChatService} from "@token-ring/chat";
 import {FileIndexService} from "@token-ring/file-index";
 import {FileSystemService} from "@token-ring/filesystem";
@@ -21,7 +20,7 @@ export const outputSchema = z.object({
   input: z
     .array(
       z.object({
-        role: z.enum(["user", "system", "assistant", "data"]),
+        role: z.enum(["user", "system", "assistant", "tool"]),
         content: z.string(),
       }),
     )
@@ -31,11 +30,11 @@ export const outputSchema = z.object({
     .min(0)
     .max(1)
     .describe("The temperature parameter for the AI model (0.0-1.0)"),
-  top_p: z
+  topP: z
     .number()
     .min(0)
     .max(1)
-    .describe("The top_p parameter for the AI model (0.0-1.0)"),
+    .describe("The topP parameter for the AI model (0.0-1.0)"),
   isExceptionallyComplex: z
     .boolean()
     .describe(
@@ -53,7 +52,7 @@ interface AnalysisResult {
   searchWebFor?: string[];
   isExceptionallyComplex: boolean;
   temperature: number;
-  top_p: number;
+  topP: number;
   searchFilesFor: string[];
   requiresFiles: string[];
 }
@@ -129,10 +128,10 @@ export async function execute({prompt}: PromptAnalyzerInput, registry: Registry)
   );
 
   // Filter out null values and cast to ChatInputMessage
-  const validFileIndexMessages: ChatInputMessage[] = fileIndexMessages.filter(Boolean) as ChatInputMessage[];
-  const validWholeFileMessages: ChatInputMessage[] = wholeFileMessages.filter(Boolean) as ChatInputMessage[];
+  const validFileIndexMessages = fileIndexMessages.filter(Boolean) as PromptAnalyzerOutput["input"];
+  const validWholeFileMessages = wholeFileMessages.filter(Boolean) as PromptAnalyzerOutput["input"];
 
-  const finalMessages: ChatInputMessage[] = [
+  const finalMessages: PromptAnalyzerOutput["input"] = [
     ...validFileIndexMessages,
     ...validWholeFileMessages,
     {role: "user", content: prompt},
@@ -142,7 +141,7 @@ export async function execute({prompt}: PromptAnalyzerInput, registry: Registry)
     model,
     input: finalMessages,
     temperature: analysis.temperature,
-    top_p: analysis.top_p,
+    topP: analysis.topP,
     isExceptionallyComplex: analysis.isExceptionallyComplex,
   };
 }

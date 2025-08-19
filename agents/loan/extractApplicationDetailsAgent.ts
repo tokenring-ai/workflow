@@ -1,6 +1,5 @@
 import ModelRegistry from "@token-ring/ai-client/ModelRegistry";
 import ChatService from "@token-ring/chat/ChatService";
-import {Registry} from "@token-ring/registry";
 import {z} from "zod";
 
 
@@ -31,17 +30,11 @@ const systemPrompt =
 
 /**
  * Agent to extract loan application details from a conversation.
- * @param input - Expected to have a `conversation` string.
- * @param workflowContext - Shared workflow context.
- * @param registry - Service registry.
- * @param agentConfig - Agent-specific configuration (not used in this agent).
- * @returns The structured loan application details.
  */
 async function process(
   input: AgentInput,
-  workflowContext: Record<string, any>,
-  registry: Registry,
-  agentConfig: Record<string, any> = {}
+  workflowContext: Record<string, unknown>,
+  agentConfig: Record<string, unknown> = {}
 ): Promise<ApplicationDetails> {
   const chatService = registry.requireFirstServiceByType(ChatService);
   const modelRegistry = registry.requireFirstServiceByType(ModelRegistry);
@@ -50,7 +43,7 @@ async function process(
     "[ExtractApplicationDetailsAgent] Starting extraction...",
   );
 
-  if (!input || false) {
+  if (!input) {
     throw new Error(
       'Input must be an object with a "conversation" string property.',
     );

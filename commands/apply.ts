@@ -14,12 +14,13 @@ export const description: string =
 interface PlanTask {
   intent?: string;
   description?: string;
-  execution?: (registry: Registry) => Promise<any>;
+  execution?: (registry: Registry) => Promise<void>;
 }
 
 /**
  * Returns help information for the apply command
  */
+// noinspection JSUnusedGlobalSymbols
 export function help(): Array<string> {
   return [
     "/apply - Execute the previously generated plan",
@@ -45,7 +46,7 @@ export async function execute(remainder: string, registry: Registry): Promise<vo
       "No plan available to apply. Use /plan first to create a plan.",
     );
     const helpLines = help();
-    helpLines.forEach(line => chatService.systemLine(line));
+    helpLines.forEach((line) => chatService.systemLine(line));
     return;
   }
 

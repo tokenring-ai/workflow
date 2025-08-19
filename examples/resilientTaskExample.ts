@@ -1,6 +1,4 @@
 /**
- * @file core/workflow/examples/resilientTaskExample.ts
- * @description Demonstrates building resilient tasks using `Runnable.withRetry` and
  *              `Runnable.withFallbacks` decorators. This example shows how to create a
  *              `Runnable` that retries on specific, transient errors and falls back to
  *              alternative services if the primary service (including its retries) fails.
@@ -191,7 +189,6 @@ class PrimaryServiceRunnable extends Runnable {
 /**
  * Creates a resilient task by wrapping a primary operation with retry logic
  * and fallback operations.
- * @returns The composed resilient runnable.
  */
 export function createResilientTaskRunnable(): Runnable {
   // Important: For stateful Runnables like PrimaryServiceRunnable (with its own attempt counter),
@@ -231,9 +228,9 @@ export function createResilientTaskRunnable(): Runnable {
       // This lambda's this._currentWorkflowContext will be set by its own invoke wrapper
       // if it were an async* gen. For now, console.log directly.
       // It should ideally also use _createLogEvent and yield.
-      const runnable = fallbackTask; // self-reference for name
+      // self-reference for name
       console.log(
-        `[${runnable.name}] Fallback 1 Invoked. Input:`,
+        `[${fallbackTask.name}] Fallback 1 Invoked. Input:`,
         JSON.stringify(input),
       );
       return fallbackServiceCall(input);
@@ -243,9 +240,8 @@ export function createResilientTaskRunnable(): Runnable {
 
   const criticalFallbackTask = new RunnableLambda(
     async (input: ServiceInput, workflowContext?: WorkflowContext): Promise<ServiceOutput> => {
-      const runnable = criticalFallbackTask;
       console.log(
-        `[${runnable.name}] Critical Fallback Invoked. Input:`,
+        `[${criticalFallbackTask.name}] Critical Fallback Invoked. Input:`,
         JSON.stringify(input),
       );
       return criticalFallbackServiceCall(input);

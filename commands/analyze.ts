@@ -19,7 +19,7 @@ interface AnalysisResult {
   isExceptionallyComplex: boolean;
   input: Array<{ role: string; content?: string }>;
   temperature?: number;
-  top_p?: number;
+  topP?: number;
   model?: string;
   error?: string;
 }
@@ -27,7 +27,7 @@ interface AnalysisResult {
 interface SubTaskAnalysis {
   input: Array<{ role: string; content?: string }>;
   temperature?: number;
-  top_p?: number;
+  topP?: number;
   model?: string;
   error?: string;
 }
@@ -39,6 +39,7 @@ interface Options {
 /**
  * Returns help information for the analyze command
  */
+// noinspection JSUnusedGlobalSymbols
 export function help(): Array<string> {
   return [
     "/analyze <option1=val1 option2=val2 ...> -- <prompt> - Analyze and execute prompts",

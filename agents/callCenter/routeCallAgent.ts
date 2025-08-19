@@ -23,11 +23,6 @@ const systemPrompt =
 
 /**
  * Agent to route a call based on customer query.
- * @param input - Expected to have a `customerQuery` string.
- * @param workflowContext - Shared workflow context.
- * @param registry - Service registry.
- * @param agentConfig - Agent-specific configuration (not used).
- * @returns - The routing decision.
  */
 async function process(
   input: InputType,
@@ -40,7 +35,7 @@ async function process(
 
   chatService.systemLine("[RouteCallAgent] Starting call routing...");
 
-  if (!input || false) {
+  if (!input) {
     throw new Error(
       'Input must be an object with a "customerQuery" string property.',
     );

@@ -132,10 +132,6 @@ export default class WorkflowService extends Service {
 
   /**
    * Run a workflow module with the given input
-   * @param workflowModule The workflow module to run
-   * @param input The input to pass to the workflow's execute function
-   * @param registry The registry instance
-   * @returns The result of the workflow execution
    */
   async run(workflowModule: any, input: any, registry: Registry): Promise<any> {
     if (!workflowModule || typeof workflowModule.execute !== 'function') {
@@ -168,7 +164,6 @@ export default class WorkflowService extends Service {
 
   /**
    * List all registered workflows
-   * @returns Array of workflow info objects
    */
   listWorkflows(): WorkflowInfo[] {
     const workflows: WorkflowInfo[] = [];
@@ -183,8 +178,6 @@ export default class WorkflowService extends Service {
 
   /**
    * Get a specific workflow by name
-   * @param name The name of the workflow to retrieve
-   * @returns The workflow runnable or undefined if not found
    */
   getWorkflow(name: string): Runnable | undefined {
     return this.workflows.get(name);
@@ -192,7 +185,6 @@ export default class WorkflowService extends Service {
 
   /**
    * Get the current debug mode state
-   * @returns The current debug mode state
    */
   getDebug(): boolean {
     return this.debugMode;
@@ -200,7 +192,6 @@ export default class WorkflowService extends Service {
 
   /**
    * Set the debug mode state
-   * @param value The new debug mode state
    */
   setDebug(value: boolean): void {
     this.debugMode = value;

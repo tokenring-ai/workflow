@@ -1,3 +1,5 @@
+// noinspection JSUnnecessarySemicolon
+
 import ModelRegistry from "@token-ring/ai-client/ModelRegistry";
 import ChatService from "@token-ring/chat/ChatService";
 import {Registry} from "@token-ring/registry";
@@ -18,36 +20,74 @@ interface ReviewResponse {
   nextSteps?: string[];
 }
 
+// Updated interfaces with specific types instead of 'any'
 interface Subtask {
   description: string;
   rationale: string;
+  explanation?: string;
+  subtaskType?: 'planning' | 'execution' | 'research';
+  requiresFurtherDecomposition?: boolean;
+  dependsOn?: string[];
+  isCritical?: boolean;
+  id?: string;
 
-  [key: string]: any;
+  // Allow additional unknown properties
+  [key: string]: unknown;
+}
+
+interface ExecutionResponse {
+  result: string;
+  detailedSummary: string;
+  success: boolean;
+  error?: string;
+  nextSteps?: string[];
+  artifacts?: Artifact[];
+  toolInvocations?: ToolInvocation[];
+}
+
+interface Artifact {
+  name: string;
+  type: string;
+  content: string;
+}
+
+interface ToolInvocation {
+  toolName: string;
+  arguments: Record<string, unknown>;
+  result?: string;
+  error?: string;
 }
 
 interface ExecutionResult {
   subtask: Subtask;
-  response: any;
+  response: ExecutionResponse;
 
-  [key: string]: any;
+  // Allow additional unknown properties if needed
+  [key: string]: unknown;
+}
+
+interface DecompositionResult {
+  subtasks: Subtask[];
+  reasoning: string;
 }
 
 interface ReviewParams {
-  request: any;
-  decomposition: any;
+  request: unknown;
+  decomposition: DecompositionResult;
   executionResults: ExecutionResult[];
   registry: Registry;
 }
 
 interface ReviewContext {
-  request: any;
+  request: unknown;
   plan: {
-    decomposition: any;
+    decomposition: DecompositionResult;
   };
   executionResults: ExecutionResult[];
-  review?: any;
+  review?: ReviewResponse;
 
-  [key: string]: any;
+  // Allow additional unknown properties
+  [key: string]: unknown;
 }
 
 /**
@@ -103,12 +143,6 @@ const reviewResponseSchema = {
 
 /**
  * Reviews the results of all subtasks and determines if the decomposed task is complete
- * @param params - The parameters object
- * @param params.request - The original request object
- * @param params.decomposition - The decomposition result from decomposeTask
- * @param params.executionResults - Array of execution results from each subtask
- * @param registry - The package registry
- * @returns - The review result
  */
 async function reviewResults({
                                request,
@@ -192,8 +226,7 @@ export default class ReviewRunnable extends Runnable {
       decomposition: context.plan.decomposition,
       executionResults: context.executionResults,
     };
-    const result = await reviewResults({...wfCtx, registry: registry});
-    context.review = result;
+    context.review = await reviewResults({...wfCtx, registry: registry});
     yield {
       type: "log",
       level: "info",

@@ -1,12 +1,14 @@
 import ModelRegistry from "@token-ring/ai-client/ModelRegistry";
 import ChatService from "@token-ring/chat/ChatService";
+import {Registry} from "@token-ring/registry";
 
 // No Zod schema for the main output, as it uses generateText.
 
 interface InputType {
   customerQuery: string;
 
-  [key: string]: any; // For other potential data from router output
+  // Allow additional arbitrary data from router output; use unknown for safety.
+  [key: string]: unknown;
 }
 
 interface OutputType {
@@ -20,18 +22,11 @@ interface AgentConfig {
 
 /**
  * A generic specialist agent that responds to a customer query based on its configured type.
- * @param input - Expected to have `customerQuery` (string).
- *                         May also contain other data if router output was passed.
- * @param workflowContext - Shared workflow context.
- * @param registry - Service registry.
- * @param agentConfig - Agent-specific configuration.
- * @param agentConfig.specialistType - Type of specialist (e.g., "technical", "account").
- * @param [agentConfig.systemPrompt] - Optional custom system prompt.
- * @returns - An object containing the agent's text response.
+ *                May also contain other data if router output was passed.
  */
 async function process(
   input: InputType,
-  workflowContext: any,
+  workflowContext: Record<string, unknown>,
   registry: Registry,
   agentConfig: AgentConfig = {}
 ): Promise<OutputType> {
@@ -43,7 +38,7 @@ async function process(
     `[GenericSpecialistAgent:${specialistType}] Starting response...`,
   );
 
-  if (!input || false) {
+  if (!input) {
     throw new Error(
       'Input must be an object with a "customerQuery" string property.',
     );
@@ -59,8 +54,6 @@ async function process(
 
   try {
     // Construct messages for generateText
-    // If router output was passed and merged, it might be in `input` if needed for context here.
-    // For this example, we'll primarily use the customerQuery.
     const messages = [
       {role: "system", content: systemPrompt},
       {role: "user", content: input.customerQuery},
@@ -81,9 +74,10 @@ async function process(
       `[GenericSpecialistAgent:${specialistType}] Generated response of length ${responseText.length}.`,
     );
     return {response: responseText};
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const errMsg = error instanceof Error ? error.message : String(error);
     chatService.errorLine(
-      `[GenericSpecialistAgent:${specialistType}] Error during text generation: ${error.message}`,
+      `[GenericSpecialistAgent:${specialistType}] Error during text generation: ${errMsg}`,
     );
     console.error(error);
     throw error;

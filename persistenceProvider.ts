@@ -11,7 +11,7 @@ export interface WorkflowStateRecord {
   /** Identifier for the next step/Runnable to be executed */
   currentStepId: string;
   /** The output from the previously completed step, to be used as input for currentStepId */
-  lastOutput: any;
+  lastOutput: unknown;
   /** The state of the workflow context to be restored */
   workflowContext: WorkflowContext;
   /** Timestamp of when the state was last saved */
@@ -26,17 +26,12 @@ export interface WorkflowStateRecord {
 export abstract class PersistenceProvider {
   /**
    * Saves the current state of a workflow instance.
-   * @param workflowInstanceId - Unique ID for the executing workflow instance.
-   * @param definitionId - Identifier for the workflow definition.
-   * @param nextStepId - Identifier of the next step/Runnable to be executed.
-   * @param lastOutput - The output from the successfully completed step.
-   * @param currentWorkflowContext - The current workflow context.
    */
   async saveWorkflowState(
     workflowInstanceId: string,
     definitionId: string,
     nextStepId: string,
-    lastOutput: any,
+    lastOutput: unknown,
     currentWorkflowContext: WorkflowContext,
   ): Promise<void> {
     // Ensure `lastOutput` and `currentWorkflowContext` are serializable (e.g., to JSON).
@@ -51,8 +46,6 @@ export abstract class PersistenceProvider {
 
   /**
    * Loads the persisted state for a workflow instance.
-   * @param workflowInstanceId - Unique ID for the executing workflow instance.
-   * @returns The saved state, or null if no state found.
    */
   async loadWorkflowState(workflowInstanceId: string): Promise<WorkflowStateRecord | null> {
     throw new Error(
@@ -63,7 +56,6 @@ export abstract class PersistenceProvider {
   /**
    * Clears any persisted state for a workflow instance.
    * Typically called upon successful completion or explicit termination of a workflow.
-   * @param workflowInstanceId - Unique ID for the executing workflow instance.
    */
   async clearWorkflowState(workflowInstanceId: string): Promise<void> {
     throw new Error(
@@ -89,7 +81,7 @@ export class InMemoryPersistenceProvider extends PersistenceProvider {
     workflowInstanceId: string,
     definitionId: string,
     nextStepId: string,
-    lastOutput: any,
+    lastOutput: unknown,
     currentWorkflowContext: WorkflowContext,
   ): Promise<void> {
     const stateRecord: WorkflowStateRecord = {

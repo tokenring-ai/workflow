@@ -1,33 +1,32 @@
 {
-	"name": "@token-ring/workflow",
-	"version": "0.1.0",
+ "name": "@token-ring/workflow",
+ "version": "0.1.0",
  "description": "Workflow package",
-	"dependencies": {
-		"@token-ring/ai-client": "0.1.0",
-		"@token-ring/chat": "0.1.0",
-
-		"@token-ring/filesystem": "0.1.0",
-		"@token-ring/registry": "0.1.0",
-		"async": "^3.2.6",
-		"async-es": "^3.2.6",
-		"eventemitter3": "^5.0.1"
-	},
-	"exports": {
-		".": {
-			"types": "./index.d.ts",
-			"default": "./index.ts"
-		},
-		"./*": "./*.ts"
-	},
-	"types": "./index.d.ts",
-	"license": "MIT",
-	"scripts": {
+ "dependencies": {
+  "@token-ring/ai-client": "0.1.0",
+  "@token-ring/chat": "0.1.0",
+  "@token-ring/filesystem": "0.1.0",
+  "@token-ring/registry": "0.1.0",
+  "async": "^3.2.6",
+  "async-es": "^3.2.6",
+  "eventemitter3": "^5.0.1"
+ },
+ "exports": {
+  ".": {
+   "types": "./index.d.ts",
+   "default": "./index.ts"
+  },
+  "./*": "./*.ts"
+ },
+ "types": "./index.d.ts",
+ "license": "MIT",
+ "scripts": {
   "test": "vitest run",
-		"test:watch": "vitest"
-	},
-	"type": "module",
-	"devDependencies": {
-		"vitest": "^3.2.4",
-		"typescript": "^5.9.2"
-	}
+  "test:watch": "vitest"
+ },
+ "type": "module",
+ "devDependencies": {
+  "vitest": "^3.2.4",
+  "typescript": "^5.9.2"
+ }
 }

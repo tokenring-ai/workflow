@@ -131,11 +131,6 @@ const executionResponseSchema = z
 
 /**
  * Executes a subtask from the decomposition layer
- * @param params - The parameters object.
- * @param params.workflowContext - The shared context object for the workflow.
- * @param params.subtask - The subtask to execute.
- * @param registry - The package registry.
- * @returns - The execution result.
  */
 async function executeSubtask({workflowContext, subtask, registry}: ExecuteParams): Promise<ExecutionResult> {
   const modelRegistry = registry.requireFirstServiceByType(ModelRegistry);

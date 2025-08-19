@@ -1,5 +1,17 @@
 // core/workflow/WorkflowResponse.ts
 
+/**
+ * Wraps the async generator returned by a Runnable's invoke method,
+ * providing convenient ways to access the final response, output schema,
+ * and the raw event stream.
+ *
+ * It ensures that terminal operations like `response()` and `outputSchema()`
+ * can be called multiple times without re-consuming the generator, by caching
+ * their results. The stream itself can be iterated multiple times if the underlying
+ * generator supports it or if it's buffered, but typically an async generator is single-pass.
+ * This class provides a view over that single pass.
+ */
+// core/workflow/WorkflowResponse.ts
 import type {
   WorkflowEvent,
   WorkflowFinalOutputEvent,
@@ -18,26 +30,24 @@ import type {
  * generator supports it or if it's buffered, but typically an async generator is single-pass.
  * This class provides a view over that single pass.
  */
-export class WorkflowResponse {
-  private _asyncGenerator: WorkflowResponseType;
-  private readonly _initialMetadata: any;
-  private _responsePromise: Promise<any> | null = null;
-  private _schemaPromise: Promise<any> | null = null;
+export class WorkflowResponse<TReturn = unknown> {
+  private _asyncGenerator: WorkflowResponseType<TReturn>;
+  private readonly _initialMetadata: Record<string, unknown>;
+  private _responsePromise: Promise<TReturn> | null = null;
+  private _schemaPromise: Promise<unknown | undefined> | null = null;
   private _eventBuffer: WorkflowEvent[] = [];
   private _generatorFullyConsumed: boolean = false;
   private _consumptionError: Error | null = null;
-  private _generatorReturnValue: any = undefined;
+  private _generatorReturnValue: TReturn | undefined = undefined;
 
   /**
-   * @param asyncGenerator - The async generator from a Runnable's invoke method.
-   * @param initialMetadata - Initial metadata like workflowInstanceId, definitionId.
    */
-  constructor(asyncGenerator: WorkflowResponseType, initialMetadata: any = {}) {
+  constructor(asyncGenerator: WorkflowResponseType<TReturn>, initialMetadata: Record<string, unknown> = {}) {
     this._asyncGenerator = asyncGenerator;
     this._initialMetadata = initialMetadata;
   }
 
-  get metadata(): any {
+  get metadata(): Record<string, unknown> {
     return this._initialMetadata;
   }
 
@@ -45,14 +55,14 @@ export class WorkflowResponse {
    * Gets the workflow instance ID if provided in initial metadata.
    */
   get workflowInstanceId(): string | undefined {
-    return this._initialMetadata?.workflowInstanceId;
+    return this._initialMetadata?.workflowInstanceId as string | undefined;
   }
 
   /**
    * Gets the workflow definition ID if provided in initial metadata.
    */
   get workflowDefinitionId(): string | undefined {
-    return this._initialMetadata?.workflowDefinitionId;
+    return this._initialMetadata?.workflowDefinitionId as string | undefined;
   }
 
   /**
@@ -88,7 +98,7 @@ export class WorkflowResponse {
             result = await self._asyncGenerator.next();
           }
           // Capture the return value when generator is done
-          self._generatorReturnValue = result.value;
+          self._generatorReturnValue = result.value as TReturn;
           self._generatorFullyConsumed = true;
         } catch (err: any) {
           self._consumptionError = err; // Store error if generator throws
@@ -148,12 +158,11 @@ export class WorkflowResponse {
    * This is typically the data from the `WorkflowFinalOutputEvent` or the
    * generator's return value.
    * The result is cached, so subsequent calls return the same promise.
-   * @returns A promise that resolves to the final workflow output.
    */
-  response(): Promise<any> {
+  response(): Promise<TReturn> {
     if (!this._responsePromise) {
       this._responsePromise = (async () => {
-        let finalOutput = undefined;
+        let finalOutput: unknown = undefined;
         let hasFinalOutputEvent = false;
         // Use the replayable stream to ensure we don't miss events
         const eventStream = this.stream();
@@ -175,9 +184,9 @@ export class WorkflowResponse {
               throw this._consumptionError; // Re-throw error if consumption failed before final_output
             }
             // Use the captured generator return value if no final_output event was found
-            return this._generatorReturnValue;
+            return this._generatorReturnValue as TReturn;
           }
-          return finalOutput;
+          return finalOutput as unknown as TReturn;
         } catch (err: any) {
           // This catch block handles errors from iterating the stream (e.g., if stream() itself throws or yields an error that's rethrown)
           console.error(
@@ -194,12 +203,11 @@ export class WorkflowResponse {
    * Consumes the event stream and returns the output schema of the workflow,
    * if a `WorkflowSchemaEvent` is yielded.
    * The result is cached.
-   * @returns A promise that resolves to the schema or undefined if not found.
    */
-  outputSchema(): Promise<any | undefined> {
+  outputSchema(): Promise<unknown | undefined> {
     if (!this._schemaPromise) {
       this._schemaPromise = (async () => {
-        let schema = undefined;
+        let schema: unknown = undefined;
         const eventStream = this.stream(); // Use the replayable stream
         try {
           for await (const event of eventStream) {
@@ -228,7 +236,6 @@ export class WorkflowResponse {
   /**
    * Collects all events from the stream into an array.
    * Useful for debugging or if all events need to be processed after completion.
-   * @returns A promise that resolves to an array of all workflow events.
    */
   async allEvents(): Promise<WorkflowEvent[]> {
     const events: WorkflowEvent[] = [];

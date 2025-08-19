@@ -14,12 +14,13 @@ interface PlanTask {
   intent?: string;
   description?: string;
   subtasks?: string[];
-  execution?: (registry: Registry) => Promise<any>;
+  execution?: (registry: Registry) => Promise<unknown>;
 }
 
 /**
  * Returns help information for the plan command
  */
+// noinspection JSUnusedGlobalSymbols
 export function help(): Array<string> {
   return [
     "/plan [prompt] - Generate a plan of AI tasks from the prompt",

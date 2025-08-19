@@ -137,11 +137,10 @@ export default class IntegrationRunnable extends Runnable {
       plan: context.plan,
       executionResults: context.executionResults,
     };
-    const integration = await integrateResults({
+    context.integration = await integrateResults({
       workflowContext: wfCtx,
       registry: registry,
     });
-    context.integration = integration;
     yield {
       type: "log",
       level: "info",

@@ -1,6 +1,17 @@
 import ModelRegistry from "@token-ring/ai-client/ModelRegistry";
 import ChatService from "@token-ring/chat/ChatService";
-import {Registry} from "@token-ring/registry"; // Adjust if your path is different
+import {Registry} from "@token-ring/registry"; // Adjust if your path is different // Adjust if your path is different
+
+// No Zod schema for output as it's a simple object with a string.
+
+interface OriginalTask {
+  topic?: string;
+  constraint?: string;
+}
+
+interface PreviousWork {
+  articleText: string;
+}
 
 // No Zod schema for output as it's a simple object with a string.
 
@@ -20,7 +31,7 @@ interface InputType {
   previousWork?: PreviousWork;
   feedback?: string;
 
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 interface OutputType {
@@ -32,22 +43,12 @@ const systemPrompt =
 
 /**
  * Agent to write or revise an article based on input and feedback.
- * @param input - Input object.
- * @param input.originalTask - The initial task details, e.g., { topic: "...", constraint: "..." }.
- * @param input.topic - Topic for the article (used if originalTask is not present on first call).
- * @param input.constraint - Constraint for the article (used if originalTask is not present on first call).
- * @param input.previousWork - Object containing previous work, e.g., { articleText: "..." }.
- * @param input.feedback - Feedback on the previous work.
- * @param workflowContext - Shared workflow context.
- * @param registry - Service registry.
- * @param agentConfig - Agent-specific configuration (not heavily used here, but could be for style guides etc.).
- * @returns - An object containing the generated or revised article text.
  */
 async function process(
   input: InputType,
-  workflowContext: any,
+  workflowContext: Record<string, unknown>,
   registry: Registry,
-  agentConfig: Record<string, any> = {}
+  agentConfig: Record<string, unknown> = {}
 ): Promise<OutputType> {
   const chatService = registry.requireFirstServiceByType(ChatService);
   const modelRegistry = registry.requireFirstServiceByType(ModelRegistry);
@@ -85,7 +86,7 @@ Please provide the new, complete article.`;
     chatService.systemLine(
       `[ArticleWriterAgent] Writing new article. Topic: ${topic}`,
     );
-    userMessageContent = `Please write an article on the topic: "${topic}".
+    userMessageContent = `Please write an article on the topic: \"${topic}\".
 Constraint: ${constraint}`;
   }
 
@@ -117,9 +118,10 @@ Constraint: ${constraint}`;
       `[ArticleWriterAgent] Article processing completed. Text length: ${articleText.length}`,
     );
     return {articleText};
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const errMsg = (error as Error).message ?? "Unknown error";
     chatService.errorLine(
-      `[ArticleWriterAgent] Error during article generation/revision: ${error.message}`,
+      `[ArticleWriterAgent] Error during article generation/revision: ${errMsg}`,
     );
     console.error(error);
     throw error;

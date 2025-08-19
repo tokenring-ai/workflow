@@ -33,8 +33,6 @@ export class TranslateAgent extends Runnable<TranslateAgentInput, TranslateAgent
   agentConfig: Required<TranslateAgentConfig>;
 
   /**
-   * @param agentConfig - Configuration for the agent.
-   * @param runnableOpts - Options for Runnable base class.
    */
   constructor(agentConfig: TranslateAgentConfig, runnableOpts?: any) {
     super({
@@ -56,12 +54,9 @@ export class TranslateAgent extends Runnable<TranslateAgentInput, TranslateAgent
 
   /**
    * Executes the translation.
-   * @param input - The input object containing textToTranslate.
-   * @param context - The context containing registry.
-   * @returns An object containing the translated text and target language.
    */
   async* invoke(input: TranslateAgentInput, context?: any): AsyncGenerator<any, TranslateAgentOutput, void> {
-    if (!input || false) {
+    if (!input) {
       yield {
         type: 'log',
         level: 'error',

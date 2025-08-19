@@ -1,6 +1,4 @@
 /**
- * @file core/workflow/examples/workflowServiceExample.ts
- * @description Demonstrates the usage of WorkflowService with Runnable-based workflows,
  *              including starting, event streaming via WorkflowResponse, and resumption
  *              from a persisted state using InMemoryPersistenceProvider.
  *              It showcases how to define simple Runnables, compose them into a sequence,
@@ -26,9 +24,6 @@ import WorkflowService from "../WorkflowService.js";
 
 /**
  * Helper to create a base object for WorkflowEvents within example Runnables.
- * @param context - The workflow context.
- * @param runnableName - The name of the runnable.
- * @returns Base event properties
  */
 function createEventBase(
   context: WorkflowContext | undefined,
@@ -54,10 +49,9 @@ const step1 = new RunnableLambda(
     };
     await new Promise((resolve) => setTimeout(resolve, 50));
     if (input < 0) {
-      const err = new RunnableError("Input cannot be negative for step 1");
       // Yield step_end with error before throwing is good practice if possible
       // For simplicity here, error is caught by base if not handled by wrapper
-      throw err;
+      throw new RunnableError("Input cannot be negative for step 1");
     }
     const output = {value: input + 10};
     yield {...eventBase, type: "final_output", data: output};
@@ -150,7 +144,7 @@ export async function runWorkflowServiceDemo(): Promise<void> {
   const wfService = new WorkflowService({persistenceProvider, debug: true});
 
   const mainRegistry = new ServiceRegistry();
-  mainRegistry.register(wfService); // Register WorkflowService itself (optional, but good practice)
+  await mainRegistry.register(wfService); // Register WorkflowService itself (optional, but good practice)
   // If Runnables need other services, register them here too.
   // e.g., mainRegistry.register(new MyOtherService());
 
@@ -175,14 +169,11 @@ export async function runWorkflowServiceDemo(): Promise<void> {
 
   /**
    * Helper function to consume and log events from a WorkflowResponse.
-   * @param caseName - Identifier for the test case.
-   * @param workflowResponse - The response object from startWorkflow/resumeWorkflow.
-   * @returns The final result of the workflow.
    */
   async function processWorkflowResponse(
     caseName: string,
     workflowResponse: WorkflowResponse
-  ): Promise<any> {
+  ): Promise<unknown> {
     console.log(
       `\n--- ${caseName}: Processing WorkflowResponse (Instance: ${workflowResponse.workflowInstanceId}) ---`,
     );
@@ -212,9 +203,9 @@ export async function runWorkflowServiceDemo(): Promise<void> {
         `[${caseName}] Final Result (Instance: ${workflowResponse.workflowInstanceId}): ${JSON.stringify(finalResult)}`,
       );
       return finalResult;
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error(
-        `[${caseName}] WORKFLOW EXECUTION FAILED (Instance: ${workflowResponse.workflowInstanceId}): ${error.message}`,
+        `[${caseName}] WORKFLOW EXECUTION FAILED (Instance: ${workflowResponse.workflowInstanceId}): ${error instanceof Error ? error.message : String(error)}`,
       );
       // Optionally, get all buffered events up to the point of failure for debugging:
       // const eventsSoFar = await workflowResponse.allEvents();
@@ -223,113 +214,116 @@ export async function runWorkflowServiceDemo(): Promise<void> {
     }
   }
 
-  // 4. Run Workflow - Successful Case
-  const initialInputSuccess = 5; // Expected: Step1(15) -> Step2(30) -> Step3(25)
-  const contextOverridesSuccess = {
-    userData: {userId: "user-alpha"},
-    traceId: "trace-success-001",
+}
+}
+
+// 4. Run Workflow - Successful Case
+const initialInputSuccess = 5; // Expected: Step1(15) -> Step2(30) -> Step3(25)
+const contextOverridesSuccess = {
+  userData: {userId: "user-alpha"},
+  traceId: "trace-success-001",
+};
+const responseSuccess = wfService.startWorkflow(
+  "DemoWorkflow_v1",
+  initialInputSuccess,
+  contextOverridesSuccess,
+);
+await processWorkflowResponse("Successful Case", responseSuccess);
+
+// 5. Run Workflow - Case that will fail for Resumption Demo
+const initialInputFail = 3; // Expected: Step1(13) -> Step2 (FAILS)
+const contextOverridesFail = {userData: {userId: "user-beta"}};
+let failingInstanceId: string;
+
+const responseFail = wfService.startWorkflow(
+  "DemoWorkflow_v1",
+  initialInputFail,
+  contextOverridesFail,
+);
+failingInstanceId = responseFail.workflowInstanceId; // Get instance ID from WorkflowResponse
+try {
+  await processWorkflowResponse("Failing Case", responseFail);
+  console.log(
+    `[Failing Case] - Should not be reached as an error is expected.`,
+  );
+} catch (err: any) {
+  console.log(
+    `[Failing Case] - Caught expected error: ${err.message}. Instance ID for resumption: ${failingInstanceId}`,
+  );
+}
+
+// 6. Resume Workflow - if an instance ID was captured
+if (failingInstanceId) {
+  console.log(
+    `\n--- Attempting to Resume Workflow Instance: ${failingInstanceId} ---`,
+  );
+  console.log(
+    "NOTE: Expecting Step2 to fail again on resume with the same input unless state is altered or step logic changes.",
+  );
+  const contextOverridesResume = {
+    userData: {userId: "user-beta-resumed"},
+    traceId: `trace-resume-${failingInstanceId}`,
   };
-  const responseSuccess = wfService.startWorkflow(
-    "DemoWorkflow_v1",
-    initialInputSuccess,
-    contextOverridesSuccess,
-  );
-  await processWorkflowResponse("Successful Case", responseSuccess);
 
-  // 5. Run Workflow - Case that will fail for Resumption Demo
-  const initialInputFail = 3; // Expected: Step1(13) -> Step2 (FAILS)
-  const contextOverridesFail = {userData: {userId: "user-beta"}};
-  let failingInstanceId: string;
-
-  const responseFail = wfService.startWorkflow(
-    "DemoWorkflow_v1",
-    initialInputFail,
-    contextOverridesFail,
-  );
-  failingInstanceId = responseFail.workflowInstanceId; // Get instance ID from WorkflowResponse
   try {
-    await processWorkflowResponse("Failing Case", responseFail);
-    console.log(
-      `[Failing Case] - Should not be reached as an error is expected.`,
+    const responseResumed = await wfService.resumeWorkflow(
+      failingInstanceId,
+      contextOverridesResume,
     );
-  } catch (err: any) {
+    await processWorkflowResponse(
+      "Resumed Case (expecting failure)",
+      responseResumed,
+    );
+  } catch (error: any) {
     console.log(
-      `[Failing Case] - Caught expected error: ${err.message}. Instance ID for resumption: ${failingInstanceId}`,
+      `[Resumed Case (expecting failure)] - Caught expected error from Step2 again: ${error.message}`,
     );
   }
 
-  // 6. Resume Workflow - if an instance ID was captured
-  if (failingInstanceId) {
+  // --- Second Resumption attempt, but this time we'll "fix" the data in persistence provider (DEMO HACK) ---
+  console.log(
+    `\n--- Attempting 2nd Resume for ${failingInstanceId} with HACKED state ---`,
+  );
+  const state =
+    await persistenceProvider.loadWorkflowState(failingInstanceId);
+  if (state && state.currentStepId === "Step2_MultiplyByTwo") {
     console.log(
-      `\n--- Attempting to Resume Workflow Instance: ${failingInstanceId} ---`,
+      "HACK: Modifying persisted lastOutput for Step2 to be non-failing. Old lastOutput:",
+      state.lastOutput,
+    );
+    state.lastOutput = {value: 4}; // Step1 input 3 -> output {value:13}. Now Step2 input {value:4}
+    // Expected: Step2({value:4}) -> {value:8, history:[4]}
+    // Then Step3({value:8, history:[4]}) -> {finalValue:3, history:[4,8]}
+    await persistenceProvider.saveWorkflowState(
+      failingInstanceId,
+      state.definitionId,
+      state.currentStepId,
+      state.lastOutput,
+      state.workflowContext,
     );
     console.log(
-      "NOTE: Expecting Step2 to fail again on resume with the same input unless state is altered or step logic changes.",
+      "HACK: Persisted state updated. New lastOutput for Step2:",
+      state.lastOutput,
     );
-    const contextOverridesResume = {
-      userData: {userId: "user-beta-resumed"},
-      traceId: `trace-resume-${failingInstanceId}`,
-    };
 
-    try {
-      const responseResumed = await wfService.resumeWorkflow(
-        failingInstanceId,
-        contextOverridesResume,
-      );
-      await processWorkflowResponse(
-        "Resumed Case (expecting failure)",
-        responseResumed,
-      );
-    } catch (error: any) {
-      console.log(
-        `[Resumed Case (expecting failure)] - Caught expected error from Step2 again: ${error.message}`,
-      );
-    }
-
-    // --- Second Resumption attempt, but this time we'll "fix" the data in persistence provider (DEMO HACK) ---
-    console.log(
-      `\n--- Attempting 2nd Resume for ${failingInstanceId} with HACKED state ---`,
+    const responseResumedFixed = await wfService.resumeWorkflow(
+      failingInstanceId,
+      contextOverridesResume,
     );
-    const state =
-      await persistenceProvider.loadWorkflowState(failingInstanceId);
-    if (state && state.currentStepId === "Step2_MultiplyByTwo") {
-      console.log(
-        "HACK: Modifying persisted lastOutput for Step2 to be non-failing. Old lastOutput:",
-        state.lastOutput,
-      );
-      state.lastOutput = {value: 4}; // Step1 input 3 -> output {value:13}. Now Step2 input {value:4}
-      // Expected: Step2({value:4}) -> {value:8, history:[4]}
-      // Then Step3({value:8, history:[4]}) -> {finalValue:3, history:[4,8]}
-      await persistenceProvider.saveWorkflowState(
-        failingInstanceId,
-        state.definitionId,
-        state.currentStepId,
-        state.lastOutput,
-        state.workflowContext,
-      );
-      console.log(
-        "HACK: Persisted state updated. New lastOutput for Step2:",
-        state.lastOutput,
-      );
-
-      const responseResumedFixed = await wfService.resumeWorkflow(
-        failingInstanceId,
-        contextOverridesResume,
-      );
-      await processWorkflowResponse("Resumed Fixed Case", responseResumedFixed); // Expected: {"finalValue":3,"history":[4,8]}
-    } else {
-      console.log(
-        "Could not apply HACK, state not as expected for Step2 failure. Current step:",
-        state?.currentStepId,
-      );
-    }
+    await processWorkflowResponse("Resumed Fixed Case", responseResumedFixed); // Expected: {"finalValue":3,"history":[4,8]}
   } else {
     console.log(
-      "\n--- Resumption Demo Skipped (no failing instance ID captured) ---",
+      "Could not apply HACK, state not as expected for Step2 failure. Current step:",
+      state?.currentStepId,
     );
   }
+} else {
+  console.log(
+    "\n--- Resumption Demo Skipped (no failing instance ID captured) ---",
+  );
+}
 
-  console.log("\n--- WorkflowService Demo Finished ---");
+console.log("\n--- WorkflowService Demo Finished ---");
 }
 
 // To run this demo:

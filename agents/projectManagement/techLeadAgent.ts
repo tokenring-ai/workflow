@@ -28,11 +28,6 @@ const systemPrompt =
 
 /**
  * Tech Lead agent to break down a feature request into role-based tasks.
- * @param input - Expected to have a `featureRequest` string.
- * @param workflowContext - Shared workflow context.
- * @param registry - Service registry.
- * @param agentConfig - Agent-specific configuration (not used in this agent).
- * @returns An array of task objects.
  */
 async function process(
   input: AgentInput,
@@ -45,7 +40,7 @@ async function process(
 
   chatService.systemLine("[TechLeadAgent] Starting task breakdown...");
 
-  if (!input || false) {
+  if (!input) {
     throw new Error(
       'Input must be an object with a "featureRequest" string property.',
     );

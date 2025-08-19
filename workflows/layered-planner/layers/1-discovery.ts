@@ -18,7 +18,9 @@ interface DiscoveryContext {
   prompt: string;
   request?: ChatRequest;
 
-  [key: string]: any;
+  // Allows for additional arbitrary properties without using `any`.
+  [key: string]: unknown;
+}
 }
 
 interface DiscoveryParams {
@@ -78,9 +80,6 @@ const discoverySystemPrompt = `You are a prompt analyzer, analyzing a prompt tha
 
 /**
  * Analyze a chat payload for meta-parameters (model, temperature, etc.).
- * @param params - The parameters object.
- * @param params.originalPrompt - The initial user prompt.
- * @param registry - The package registry
  */
 async function contextDiscovery({originalPrompt}: DiscoveryParams, registry: Registry): Promise<ChatRequest> {
   const modelRegistry = registry.requireFirstServiceByType(ModelRegistry);
@@ -183,11 +182,10 @@ export default class DiscoveryRunnable extends Runnable {
   async* invoke(context: DiscoveryContext, {registry}: {
     registry: Registry
   }): AsyncGenerator<any, DiscoveryContext, unknown> {
-    const request = await contextDiscovery(
+    context.request = await contextDiscovery(
       {originalPrompt: context.prompt},
       registry,
     );
-    context.request = request;
     yield {
       type: "log",
       level: "info",

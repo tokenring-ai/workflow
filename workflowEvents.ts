@@ -10,47 +10,47 @@ export interface BaseWorkflowEvent {
 
 export type WorkflowStepStartEvent = BaseWorkflowEvent & {
   type: "step_start";
-  input?: any;
+  input?: unknown;
 };
 
 export type WorkflowStepEndEvent = BaseWorkflowEvent & {
   type: "step_end";
-  output?: any;
+  output?: unknown;
   durationMs?: number;
-  error?: { name: string; message: string; stack?: string; details?: any };
+  error?: { name: string; message: string; stack?: string; details?: unknown };
 };
 
 export type WorkflowLogEvent = BaseWorkflowEvent & {
   type: "log";
   level: "debug" | "info" | "warn" | "error";
   message: string;
-  details?: any;
+  details?: unknown;
 };
 
 export type WorkflowOutputChunkEvent = BaseWorkflowEvent & {
   type: "output_chunk";
-  data: any;
+  data: unknown;
 };
 
 export type WorkflowFinalOutputEvent = BaseWorkflowEvent & {
   type: "final_output";
-  data: any;
+  data: unknown;
 };
 
 export type WorkflowSchemaEvent = BaseWorkflowEvent & {
   type: "schema_definition";
-  schema: any;
+  schema: unknown;
 };
 
 export type WorkflowErrorEvent = BaseWorkflowEvent & {
   type: "workflow_error";
-  error: { name: string; message: string; stack?: string; details?: any };
+  error: { name: string; message: string; stack?: string; details?: unknown };
 };
 
 export type WorkflowHumanApprovalRequiredEvent = BaseWorkflowEvent & {
   type: "human_approval_required";
   taskId: string;
-  dataForApproval: any;
+  dataForApproval: unknown;
   message?: string;
   choices?: string[];
 };
@@ -59,7 +59,7 @@ export type WorkflowHumanApprovalCompletedEvent = BaseWorkflowEvent & {
   type: "human_approval_completed";
   taskId: string;
   status: "approved" | "rejected" | "modified" | string;
-  responseData?: any;
+  responseData?: unknown;
   feedback?: string;
 };
 
@@ -74,7 +74,7 @@ export type WorkflowEvent =
   | WorkflowHumanApprovalRequiredEvent
   | WorkflowHumanApprovalCompletedEvent;
 
-export type WorkflowResponseType<TReturn = any> = AsyncGenerator<
+export type WorkflowResponseType<TReturn = unknown> = AsyncGenerator<
   WorkflowEvent,
   TReturn,
   void

@@ -1,3 +1,6 @@
+// noinspection JSUnnecessarySemicolon
+
+import {ChatRequest} from "@token-ring/ai-client/client/AIChatClient";
 import ModelRegistry from "@token-ring/ai-client/ModelRegistry";
 import ChatService from "@token-ring/chat/ChatService";
 import {Registry} from "@token-ring/registry";
@@ -23,26 +26,50 @@ interface DecompositionResult {
   reasoning: string;
 }
 
+/**
+ * Types for task decomposition
+ */
+interface SubTask {
+  description: string;
+  rationale: string;
+  explanation: string;
+  requiresFurtherDecomposition: boolean;
+  subtaskType: 'planning' | 'execution' | 'research';
+  id: string;
+  dependsOn?: string[];
+  isCritical?: boolean;
+}
+
+interface DecompositionResult {
+  subtasks: SubTask[];
+  reasoning: string;
+}
+
 interface WorkflowContext {
   sharedData: {
-    discovery: any;
-    [key: string]: any;
+    discovery: ChatRequest;
+    [key: string]: unknown;
   };
   options: {
     breadth?: number;
-    [key: string]: any;
+    [key: string]: unknown;
   };
 }
 
+interface DecomposeResult {
+  request: ChatRequest;
+  decomposition: DecompositionResult;
+}
+
 interface DecomposeContext {
-  request: any;
+  request: ChatRequest;
   options?: {
     breadth?: number;
-    [key: string]: any;
+    [key: string]: unknown;
   };
-  plan?: any;
+  plan?: DecomposeResult;
 
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 /**
@@ -122,9 +149,6 @@ const decompositionSchema = {
 
 /**
  * Decomposes a task into logical subtasks based on the input from the discovery layer
- * @param workflowContext - The shared context object for the workflow.
- * @param registry - The package registry
- * @returns - The decomposed task with subtasks
  */
 async function decomposeTask(workflowContext: WorkflowContext, registry: Registry) {
   const modelRegistry = registry.requireFirstServiceByType(ModelRegistry);
@@ -191,8 +215,7 @@ export default class DecomposeRunnable extends Runnable {
       sharedData: {discovery: context.request},
       options: {breadth: context.options?.breadth || 5},
     };
-    const plan = await decomposeTask(wfCtx, registry);
-    context.plan = plan;
+    context.plan = await decomposeTask(wfCtx, registry);
     yield {
       type: "log",
       level: "info",

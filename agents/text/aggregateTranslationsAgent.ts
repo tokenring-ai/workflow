@@ -43,13 +43,13 @@ interface WorkerResult {
   id: string;
   output: TranslationOutput;
 
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 interface AgentConfig {
   originalText: string;
 
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 const systemPrompt =
@@ -57,17 +57,11 @@ const systemPrompt =
 
 /**
  * Agent to aggregate multiple translations of an original text.
- * @param input - Expected to be an array of outputs from translateAgent,
  *                e.g., `[{ id: 'worker1', output: { translatedText: '...', language: 'German' } }, ...]`.
- * @param workflowContext - Shared workflow context.
- * @param registry - Service registry.
- * @param agentConfig - Agent-specific configuration.
- * @param agentConfig.originalText - The original text that was translated.
- * @returns The structured aggregation of translations.
  */
 async function process(
   input: WorkerResult[],
-  workflowContext: Record<string, any>,
+  workflowContext: Record<string, unknown>,
   registry: Registry,
   agentConfig: AgentConfig = {originalText: ''}
 ): Promise<AggregatedOutput> {
@@ -75,8 +69,7 @@ async function process(
   const modelRegistry = registry.requireFirstServiceByType(ModelRegistry);
 
   if (
-    !agentConfig.originalText ||
-    false
+    !agentConfig.originalText
   ) {
     throw new Error(
       "originalText must be specified in agentConfig and be a string.",

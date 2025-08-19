@@ -62,6 +62,7 @@ Your Output: { "subPrompts": ["Identify and list the main themes present in the 
 
   const [result] = await client.generateObject(
     {
+      tools: {},
       messages: [
         {role: "system", content: systemPromptForSubtasks},
         {role: "user", content: mainPrompt},
@@ -131,14 +132,13 @@ export async function execute(
       chatService.systemLine(
         `[TaskPlanner] Finished analyzing subtask ${i + 1}/${subtaskPrompts.length}.`,
       );
-    } catch (error: any) {
+    } catch (error) {
+      // Convert unknown error to an Error instance for safe property access
+      const err = error instanceof Error ? error : new Error(String(error));
       chatService.errorLine(
-        `[TaskPlanner] Error analyzing subtask ${i + 1}/${subtaskPrompts.length}: "${subtaskPrompt}". Error: ${error.message}`,
+        `[TaskPlanner] Error analyzing subtask ${i + 1}/${subtaskPrompts.length}: "${subtaskPrompt}". Error: ${err.message}`,
       );
-      // Optionally, decide whether to continue with other subtasks or re-throw to stop execution
-      // For now, we log the error and continue with other subtasks.
-      // To stop, you could re-throw the error: throw error;
-      // Or push an error object: allSubtaskAnalysisResults.push({ error: error.message, subtask: subtaskPrompt });
+      // Continue with other subtasks; optionally could push an error placeholder
     }
   }
 

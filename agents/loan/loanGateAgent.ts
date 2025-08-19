@@ -34,11 +34,6 @@ const systemPrompt =
 
 /**
  * Agent to decide if a loan application should proceed.
- * @param input - Expected to be the output of extractApplicationDetailsAgent.
- * @param workflowContext - Shared workflow context.
- * @param registry - Service registry.
- * @param agentConfig - Agent-specific configuration (not used in this agent).
- * @returns The loan decision.
  */
 async function process(
   input: LoanApplicationInput,
@@ -52,9 +47,7 @@ async function process(
   chatService.systemLine("[LoanGateAgent] Starting loan decision process...");
 
   if (
-    !input ||
-    false ||
-    false
+    !input
   ) {
     throw new Error(
       "Input must be an object with loan_amount and monthly_income numbers.",

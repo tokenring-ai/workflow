@@ -28,7 +28,7 @@ interface Message {
 
 interface GenerateObjectParams {
   messages: Message[];
-  schema?: any;
+  schema?: unknown;
   prompt?: string;
 }
 
@@ -38,23 +38,23 @@ interface GenerateTextParams {
 }
 
 interface MockAiClient {
-  generateObject: (params: GenerateObjectParams, registry: Registry) => Promise<{ object: any }>;
+  generateObject: (params: GenerateObjectParams, registry: Registry) => Promise<{ object: unknown }>;
   generateText: (params: GenerateTextParams, registry: Registry) => Promise<{ text: string }>;
 }
 
 interface MockModelRegistry {
-  getFirstOnlineClient: (config: any) => Promise<MockAiClient>;
+  getFirstOnlineClient: (config: unknown) => Promise<MockAiClient>;
 }
 
 interface MockRegistry {
-  requireFirstServiceByType: (typeConstructor: Function) => any;
-  getService: (serviceName: string) => any;
+  requireFirstServiceByType: (typeConstructor: Function) => unknown;
+  getService: (serviceName: string) => unknown;
 }
 
 interface WorkflowContext {
-  sharedData: Record<string, any>;
-  executionHistory: any[];
-  messages: any[];
+  sharedData: Record<string, unknown>;
+  executionHistory: unknown[];
+  messages: unknown[];
   options: {
     breadth: number;
     maxPasses: number;
@@ -64,7 +64,7 @@ interface WorkflowContext {
     minConfidenceForAutoProceed: number;
   };
   iterationCount: number;
-  iterationArchives: any[];
+  iterationArchives: unknown[];
 }
 
 interface ChainingWorkflowDef {
@@ -74,9 +74,9 @@ interface ChainingWorkflowDef {
   steps: Array<{
     id: string;
     agentModulePath: string;
-    outputSchema?: any;
-    config?: any;
-    inputMapping?: any;
+    outputSchema?: unknown;
+    config?: unknown;
+    inputMapping?: unknown;
   }>;
 }
 
@@ -91,12 +91,12 @@ interface RoutingWorkflowDef {
   routes: Record<string, {
     id: string;
     agentModulePath: string;
-    config: any;
+    config: unknown;
   }>;
   defaultRoute: {
     id: string;
     agentModulePath: string;
-    config: any;
+    config: unknown;
   };
   passRouterOutputToRoutedAgent: boolean;
 }
@@ -108,11 +108,11 @@ interface ParallelWorkflowDef {
   workerAgents: Array<{
     id: string;
     agentModulePath: string;
-    config?: any;
+    config?: unknown;
   }>;
   aggregatorAgent: {
     agentModulePath: string;
-    config?: any;
+    config?: unknown;
   };
 }
 
@@ -122,15 +122,15 @@ interface OrchestratorWorkflowDef {
   description: string;
   orchestratorAgent: {
     agentModulePath: string;
-    config?: any;
+    config?: unknown;
   };
   workerAgentsMap: Record<string, {
     agentModulePath: string;
-    config?: any;
+    config?: unknown;
   }>;
   aggregatorAgent: {
     agentModulePath: string;
-    config?: any;
+    config?: unknown;
   };
 }
 
@@ -140,13 +140,13 @@ interface EvaluatorOptimizerWorkflowDef {
   description: string;
   generatorAgent: {
     agentModulePath: string;
-    config?: any;
+    config?: unknown;
   };
   evaluatorAgent: {
     agentModulePath: string;
-    config?: any;
+    config?: unknown;
   };
-  initialGeneratorInput: any;
+  initialGeneratorInput: unknown;
   maxIterations: number;
 }
 

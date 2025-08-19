@@ -17,6 +17,7 @@ export const description: string =
 /**
  * Returns help information for the workflow command
  */
+// noinspection JSUnusedGlobalSymbols
 export function help(): Array<string> {
   return [
     "/workflow [action] [args...] - Run and manage workflows",

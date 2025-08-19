@@ -34,12 +34,7 @@ interface AgentConfig {
 
 /**
  * Generic estimation agent for different roles.
- * @param input - Expected to be a task object from TechLeadAgent,
  *                e.g., { role: 'developer', taskId: 'dev-01', taskDescription: '...' }.
- * @param workflowContext - Shared workflow context.
- * @param registry - Service registry.
- * @param agentConfig - Agent-specific configuration. Can be used to specialize the prompt further if needed.
- * @returns The estimation object.
  */
 async function process(
   input: TaskInput,
@@ -56,10 +51,7 @@ async function process(
   );
 
   if (
-    !input ||
-    false ||
-    false ||
-    false
+    !input
   ) {
     throw new Error(
       "Input must be a task object with role, taskId, and taskDescription string properties.",

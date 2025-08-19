@@ -81,13 +81,8 @@ const systemPrompt =
 
 /**
  * Scrum Master agent to aggregate task estimations and prepare a report.
- * @param input - Expected to be { originalRequest: { featureRequest: "..." },
  *                                orchestratorTasks: [/...tech lead output.../],
  *                                workerExecutionDetails: [/...results from estimation agents.../] }.
- * @param workflowContext - Shared workflow context.
- * @param registry - Service registry.
- * @param agentConfig - Agent-specific configuration (not used in this agent).
- * @returns The scrum master's report.
  */
 async function process(
   input: AgentInput,

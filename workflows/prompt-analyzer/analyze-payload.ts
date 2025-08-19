@@ -1,3 +1,4 @@
+import {ChatRequest} from "@token-ring/ai-client/client/AIChatClient";
 import ModelRegistry from "@token-ring/ai-client/ModelRegistry";
 import {Registry} from "@token-ring/registry";
 
@@ -8,7 +9,7 @@ const outputSchema = z.object({
   temperature: z.number().min(0).max(1),
 
   // Top_p between 0.0 and 1.0
-  top_p: z.number().min(0).max(1),
+  topP: z.number().min(0).max(1),
 
   // How much reasoning should be applied (0 = low, 1 = medium, 2 = high, 3 = very high)
   reasoning: z.number().min(0).max(3).int(),
@@ -41,14 +42,10 @@ interface ChatMessage {
   content: string;
 }
 
-// Interface for chat request
-interface ChatRequest {
-  messages: ChatMessage[];
-}
 
 const systemPrompt = `You are a prompt analyzer, analyzing a prompt that will be fed to an AI model. Given the following chat payload, determine:
 - A suitable temperature (0.0–1.0).
-- A suitable top_p (0.0–1.0).
+- A suitable topP (0.0–1.0).
 - Whether a low, or high parameter AI model is needed to respond to the query.
 - How much reasoning should be applied (0 = low, 1 = medium, 2 = high, 3 = very high).
 - A list of any specific files that are needed to complete the request. Each item should be a file path relative to the project root.
@@ -58,8 +55,6 @@ const systemPrompt = `You are a prompt analyzer, analyzing a prompt that will be
 
 /**
  * Analyze a chat payload for meta-parameters (model, temperature, etc.).
- * @param request - The chat payload.
- * @param registry - The package registry
  */
 export default async function analyzePayload(
   request: ChatRequest,
@@ -81,6 +76,7 @@ ${input.slice(-5000)}`;
   // Generate object using schema
   const [output] = await client.generateObject(
     {
+      tools: {},
       messages: [
         {
           role: "system",
