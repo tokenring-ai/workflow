@@ -28,11 +28,9 @@ export default class WorkflowService implements TokenRingService {
     );
   }
 
-  async start(): Promise<void> {
+  async run(): Promise<void> {
     this.app.serviceOutput(`[WorkflowService] Loaded ${this.workflows.size} workflows`);
   }
-
-  async stop(): Promise<void> {}
 
   getWorkflow(name: string): WorkflowItem | undefined {
     return this.workflows.get(name);
