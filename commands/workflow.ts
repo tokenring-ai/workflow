@@ -1,8 +1,6 @@
 import Agent from "@tokenring-ai/agent/Agent";
-import {AgentCommandService, AgentManager} from "@tokenring-ai/agent";
-import work from "@tokenring-ai/agent/commands/work";
+import {AgentCommandService} from "@tokenring-ai/agent";
 import {runSubAgent} from "@tokenring-ai/agent/runSubAgent";
-import {AgentEventState} from "@tokenring-ai/agent/state/agentEventState";
 import type {TokenRingAgentCommand} from "@tokenring-ai/agent/types";
 import WorkflowService from "../WorkflowService.ts";
 
