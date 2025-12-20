@@ -1,3 +1,4 @@
+import {Agent, AgentManager} from "@tokenring-ai/agent";
 import TokenRingApp from "@tokenring-ai/app";
 import {TokenRingService} from "@tokenring-ai/app/types";
 import {z} from "zod";
@@ -41,5 +42,22 @@ export default class WorkflowService implements TokenRingService {
       key,
       workflow,
     }));
+  }
+
+  async spawnWorkflow(workflowName: string, { headless }: { headless: boolean }): Promise<Agent> {
+    const agentManager = this.app.requireService(AgentManager);
+
+    const workflow = this.getWorkflow(workflowName);
+    if (!workflow) {
+      throw new Error(`Workflow "${workflowName}" not found`);
+    }
+
+    const agent = await agentManager.spawnAgent({
+      agentType: workflow.agentType,
+      headless,
+    });
+    agent.handleInput({message: `/workflow run ${workflowName}`});
+
+    return agent;
   }
 }
