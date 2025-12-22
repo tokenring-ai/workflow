@@ -6,7 +6,7 @@ import WorkflowService from "../WorkflowService.ts";
 
 const description = "/workflow run <name> - Run a workflow by name." as const;
 
-export async function execute(remainder: string | undefined, agent: Agent): Promise<void> {
+export async function execute(remainder: string, agent: Agent): Promise<void> {
   const workflowService = agent.app.getService(WorkflowService);
   const agentCommandService = agent.app.getService(AgentCommandService);
   
