@@ -1,42 +1,9 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 import workflowCommand from './workflow';
-import Agent from '@tokenring-ai/agent/Agent';
 import { AgentCommandService } from '@tokenring-ai/agent';
 import { runSubAgent } from '@tokenring-ai/agent/runSubAgent';
 import WorkflowService from '../WorkflowService';
-import type { TokenRingAgentCommand } from '@tokenring-ai/agent/types';
 
-// Mock dependencies
-vi.mock('@tokenring-ai/agent/Agent', () => {
-  return {
-    default: class MockAgent {
-      constructor(public app: any, public config: any) {
-        this.app = app;
-        this.config = config;
-      }
-      infoLine = vi.fn();
-      askHuman = vi.fn();
-      headless = false;
-    }
-  };
-});
-
-vi.mock('@tokenring-ai/agent', () => ({
-  AgentCommandService: vi.fn(),
-}));
-
-vi.mock('@tokenring-ai/agent/runSubAgent', () => ({
-  runSubAgent: vi.fn(),
-}));
-
-vi.mock('../WorkflowService', () => {
-  return {
-    default: class MockWorkflowService {
-      getWorkflow = vi.fn();
-      listWorkflows = vi.fn();
-    }
-  };
-});
 
 describe('workflow command', () => {
   let mockAgent: any;

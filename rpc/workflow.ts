@@ -1,4 +1,3 @@
-import { AgentManager } from "@tokenring-ai/agent";
 import TokenRingApp from "@tokenring-ai/app";
 import { createJsonRPCEndpoint } from "@tokenring-ai/web-host/jsonrpc/createJsonRPCEndpoint";
 import WorkflowService from "../WorkflowService.js";

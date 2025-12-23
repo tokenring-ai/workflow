@@ -1,6 +1,5 @@
 import {JsonRPCSchema} from "@tokenring-ai/web-host/jsonrpc/types";
 import { z } from "zod";
-import { WorkflowItemSchema } from "../WorkflowService.ts";
 
 export default {
   path: "/rpc/workflow",
