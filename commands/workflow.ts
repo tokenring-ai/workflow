@@ -8,7 +8,6 @@ const description = "/workflow run <name> - Run a workflow by name." as const;
 
 export async function execute(remainder: string, agent: Agent): Promise<void> {
   const workflowService = agent.app.getService(WorkflowService);
-  const agentCommandService = agent.app.getService(AgentCommandService);
   
   if (!workflowService) {
     agent.infoLine("Workflow service is not running.");
@@ -55,9 +54,9 @@ export async function execute(remainder: string, agent: Agent): Promise<void> {
     }*/
 
     agent.infoLine(`Running workflow: ${workflow.name}\n`);
-    
-    for (const step of workflow.steps) {
-      await agentCommandService?.executeAgentCommand(agent, step);
+
+    for (const message of workflow.steps) {
+      agent.handleInput({message});
     }
   } else if (command === "spawn") {
     const workflowName = args.join(" ");
