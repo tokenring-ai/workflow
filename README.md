@@ -1,16 +1,20 @@
 # @tokenring-ai/workflow
 
-Multi-step workflow orchestration system for TokenRing AI agents. Execute sequential command workflows with configuration-driven setup and support for agent spawning.
+Service for running multi-step agent workflows with configuration-driven setup and support for agent spawning.
 
 ## Overview
 
-The workflow package provides a simple yet powerful way to define and execute multi-step workflows within the TokenRing AI ecosystem. It integrates seamlessly with the agent system to run sequential command chains, supporting both direct execution on the current agent and spawning new agents with specific types.
+The workflow package provides a comprehensive system for defining and executing multi-step workflows within the TokenRing AI ecosystem. It integrates seamlessly with the agent system to run sequential command chains, supporting both direct execution on the current agent and spawning new agents with specific types. The package includes JSON-RPC endpoints for remote workflow management and chat commands for interactive execution.
 
-## Installation
+## Key Features
 
-```bash
-npm install @tokenring-ai/workflow
-```
+- **Multi-step Workflow Execution**: Execute sequential command chains with any agent commands
+- **Agent Spawning**: Create new agents of specified types to run workflows
+- **Configuration-driven**: Workflows defined in configuration files with schema validation
+- **JSON-RPC API**: Remote workflow management via WebSocket API
+- **Interactive Commands**: `/workflow` chat command with subcommands
+- **Workflow Listing**: Display available workflows with details
+- **Headless Support**: Run workflows in background agents
 
 ## Package Structure
 
@@ -21,6 +25,9 @@ pkg/workflow/
 ├── chatCommands.ts             # Command exports
 ├── commands/workflow.ts        # /workflow command implementation
 ├── index.ts                    # Main exports and schemas
+├── rpc/                        # JSON-RPC endpoints
+│   ├── workflow.ts             # RPC handler
+│   └── schema.ts               # RPC schema definitions
 └── package.json
 ```
 
@@ -35,8 +42,17 @@ class WorkflowService implements TokenRingService {
   name = "WorkflowService";
   description = "Manages multi-step agent workflows";
   
-  getWorkflow(name: string): WorkflowItem | undefined;
-  listWorkflows(): Array<{ key: string; workflow: WorkflowItem }>;
+  constructor(app: TokenRingApp, workflows: Record<string, WorkflowItem>)
+  
+  // Service lifecycle
+  async run(): Promise<void>
+  
+  // Workflow management
+  getWorkflow(name: string): WorkflowItem | undefined
+  listWorkflows(): Array<{ key: string; workflow: WorkflowItem }>
+  
+  // Agent spawning
+  async spawnWorkflow(workflowName: string, { headless }: { headless: boolean }): Promise<Agent>
 }
 ```
 
@@ -188,31 +204,75 @@ Retrieves a workflow by name.
 **Parameters:**
 - `name`: The workflow identifier
 
-**Returns:** WorkflowItem or undefined if not found
+**Returns:**
+- WorkflowItem or undefined if not found
 
-#### `listWorkflows(): Array<{ key: string; workflow: WorkflowItem }>`
+#### `listWorkflows(): Array<{ key: string; workflow: WorkflowItem }>``
 
 Lists all available workflows.
 
-**Returns:** Array of workflow entries with key and workflow object
+**Returns:**
+- Array of workflow entries with key and workflow object
+
+#### `spawnWorkflow(workflowName: string, { headless }: { headless: boolean }): Promise<Agent>`
+
+Spawns a new agent and runs the specified workflow.
+
+**Parameters:**
+- `workflowName`: The name of the workflow to run
+- `headless`: Whether to run in headless mode (default: false)
+
+**Returns:**
+- Promise resolving to the spawned Agent instance
 
 ### Configuration Schema
 
 ```typescript
 WorkflowConfigSchema = z.record(z.string(), WorkflowItemSchema)
-```
 
-Validates the workflows configuration object:
-- Keys are workflow identifiers (strings)
-- Values are WorkflowItem objects
-
-```typescript
 WorkflowItemSchema = z.object({
   name: z.string(),
   description: z.string(),
   agentType: z.string(),
   steps: z.array(z.string()),
 })
+```
+
+### JSON-RPC API
+
+#### Endpoints
+
+- `listWorkflows`: Query all available workflows
+- `getWorkflow`: Get specific workflow by name
+- `spawnWorkflow`: Spawn new agent and run workflow
+
+#### Example Usage
+
+```typescript
+import { createJsonRPCEndpoint } from "@tokenring-ai/web-host/jsonrpc/createJsonRPCEndpoint";
+
+// Create JSON-RPC endpoint
+const workflowRpc = createJsonRPCEndpoint(WorkflowRpcSchema, {
+  listWorkflows(args, app) {
+    const workflowService = app.requireService(WorkflowService);
+    return workflowService.listWorkflows();
+  },
+  
+  getWorkflow(args, app) {
+    const workflowService = app.requireService(WorkflowService);
+    return workflowService.getWorkflow(args.name);
+  },
+  
+  spawnWorkflow(args, app) {
+    const workflowService = app.requireService(WorkflowService);
+    return workflowService.spawnWorkflow(args.workflowName, args);
+  }
+});
+
+// Call from client
+const workflows = await workflowRpc.listWorkflows({});
+const specificWorkflow = await workflowRpc.getWorkflow({ name: "morning-article" });
+const agent = await workflowRpc.spawnWorkflow({ workflowName: "morning-article", headless: true });
 ```
 
 ## Integration with TokenRing
@@ -223,6 +283,8 @@ The workflow package integrates with several TokenRing services:
 - **Agent System**: Supports both current agent execution and agent spawning
 - **Plugin System**: Auto-registers with the TokenRing application
 - **Configuration System**: Validates workflow configuration through Zod schemas
+- **WebHostService**: Provides JSON-RPC endpoints for remote access
+- **AgentManager**: Handles agent spawning and lifecycle
 
 ## Execution Flow
 
@@ -233,12 +295,14 @@ The workflow package integrates with several TokenRing services:
    - `spawn`: Creates new agent with specified type
 4. **Step Execution**: Sequential execution of all workflow steps
 5. **Command Processing**: Each step processed through AgentCommandService
+6. **Output Forwarding**: Results forwarded back to parent agent when spawning
 
 ## Error Handling
 
 - **Workflow Not Found**: Clear error message when specified workflow doesn't exist
 - **Configuration Validation**: Schema validation ensures proper workflow structure
 - **Step Execution**: Individual step failures are reported but don't stop workflow execution
+- **Agent Spawning**: Proper error handling for agent creation failures
 
 ## Examples
 
@@ -295,14 +359,36 @@ Execute with:
 /workflow spawn market-analysis
 ```
 
+### Headless Workflow Execution
+
+```javascript
+export default {
+  workflows: {
+    "background-data-processing": {
+      name: "Background Data Processing",
+      description: "Process data without user interaction",
+      agentType: "dataProcessor",
+      steps: [
+        "/tools enable @tokenring-ai/database/query",
+        "/chat Process incoming data batches",
+        "/chat Generate summary reports"
+      ]
+    }
+  }
+};
+```
+
+Execute in background:
+```bash
+/workflow spawn background-data-processing
+```
+
 ## Dependencies
 
 - **@tokenring-ai/app**: Base application framework and service management
 - **@tokenring-ai/agent**: Agent system and command execution
-- **@tokenring-ai/utility**: Utility functions and helpers
+- **@tokenring-ai/web-host**: WebSocket server and JSON-RPC support
 - **zod**: Schema validation and type safety
-
-```
 
 ## License
 
