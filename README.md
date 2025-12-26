@@ -15,6 +15,7 @@ The workflow package provides a comprehensive system for defining and executing 
 - **Interactive Commands**: `/workflow` chat command with subcommands
 - **Workflow Listing**: Display available workflows with details
 - **Headless Support**: Run workflows in background agents
+- **Error Handling**: Comprehensive error handling for workflow execution
 
 ## Package Structure
 
@@ -28,7 +29,8 @@ pkg/workflow/
 ├── rpc/                        # JSON-RPC endpoints
 │   ├── workflow.ts             # RPC handler
 │   └── schema.ts               # RPC schema definitions
-└── package.json
+├── package.json
+└── vitest.config.ts            # Testing configuration
 ```
 
 ## Core Components
@@ -67,6 +69,21 @@ interface WorkflowItem {
   agentType: string;      // Required agent type for execution
   steps: string[];        // Sequential commands to execute
 }
+```
+
+### Command Implementation
+
+The workflow command handles both listing and execution:
+
+```typescript
+// List workflows
+/workflow
+
+// Run workflow on current agent
+/workflow run <name>
+
+// Spawn new agent and run workflow
+/workflow spawn <name>
 ```
 
 ## Usage
@@ -207,7 +224,7 @@ Retrieves a workflow by name.
 **Returns:**
 - WorkflowItem or undefined if not found
 
-#### `listWorkflows(): Array<{ key: string; workflow: WorkflowItem }>``
+#### `listWorkflows(): Array<{ key: string; workflow: WorkflowItem }>`
 
 Lists all available workflows.
 
@@ -326,10 +343,8 @@ export default {
     }
   }
 };
-```
 
-Execute with:
-```bash
+// Execute with:
 /workflow run research-and-write
 ```
 
@@ -352,10 +367,8 @@ export default {
     }
   }
 };
-```
 
-Execute with:
-```bash
+// Execute with:
 /workflow spawn market-analysis
 ```
 
@@ -376,10 +389,8 @@ export default {
     }
   }
 };
-```
 
-Execute in background:
-```bash
+// Execute in background:
 /workflow spawn background-data-processing
 ```
 
