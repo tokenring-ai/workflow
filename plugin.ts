@@ -1,28 +1,33 @@
 import {AgentCommandService} from "@tokenring-ai/agent";
-import TokenRingApp from "@tokenring-ai/app";
+import {TokenRingPlugin} from "@tokenring-ai/app";
+import {WebHostService} from "@tokenring-ai/web-host";
+import JsonRpcResource from "@tokenring-ai/web-host/JsonRpcResource";
+import {z} from "zod";
 import chatCommands from "./chatCommands.ts";
 import {WorkflowConfigSchema} from "./index.ts";
-import WorkflowService from "./WorkflowService";
-import workflowRPC from "./rpc/workflow";
-import { WebHostService } from "@tokenring-ai/web-host";
-import JsonRpcResource from "@tokenring-ai/web-host/JsonRpcResource";
-import { TokenRingPlugin } from "@tokenring-ai/app";
 import packageJSON from "./package.json" with {type: "json"};
+import workflowRPC from "./rpc/workflow";
+import WorkflowService from "./WorkflowService";
+
+const packageConfigSchema = z.object({
+  workflows: WorkflowConfigSchema
+});
 
 export default {
   name: packageJSON.name,
   version: packageJSON.version,
   description: packageJSON.description,
-  install(app: TokenRingApp) {
-    const config = app.getConfigSlice('workflows', WorkflowConfigSchema);
+  install(app, config) {
+    // const config = app.getConfigSlice('workflows', WorkflowConfigSchema);
     app.waitForService(AgentCommandService, agentCommandService =>
       agentCommandService.addAgentCommands(chatCommands)
     );
-    const workflowService = new WorkflowService(app, config);
+    const workflowService = new WorkflowService(app, config.workflows);
     app.addServices(workflowService);
 
     app.waitForService(WebHostService, webHostService => {
       webHostService.registerResource("Workflow RPC endpoint", new JsonRpcResource(app, workflowRPC));
     });
-  }
-} satisfies TokenRingPlugin;
+  },
+  config: packageConfigSchema
+} satisfies TokenRingPlugin<typeof packageConfigSchema>;
