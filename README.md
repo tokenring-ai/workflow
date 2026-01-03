@@ -6,6 +6,22 @@ Service for running multi-step agent workflows with configuration-driven setup a
 
 The workflow package provides a comprehensive system for defining and executing multi-step workflows within the TokenRing AI ecosystem. It integrates seamlessly with the agent system to run sequential command chains, supporting both direct execution on the current agent and spawning new agents with specific types. The package includes JSON-RPC endpoints for remote workflow management and chat commands for interactive execution.
 
+## Installation
+
+To install this package, add it to your project using npm:
+
+```bash
+npm install @tokenring-ai/workflow
+```
+
+Or using bun:
+
+```bash
+bun add @tokenring-ai/workflow
+```
+
+Then, in your TokenRing application, install the workflow plugin.
+
 ## Key Features
 
 - **Multi-step Workflow Execution**: Execute sequential command chains with any agent commands
@@ -15,23 +31,8 @@ The workflow package provides a comprehensive system for defining and executing 
 - **Interactive Commands**: `/workflow` chat command with subcommands
 - **Workflow Listing**: Display available workflows with details
 - **Headless Support**: Run workflows in background agents
+- **Output Forwarding**: Forward chat, reasoning, human requests, and system output when spawning agents
 - **Error Handling**: Comprehensive error handling for workflow execution
-
-## Package Structure
-
-```
-pkg/workflow/
-├── WorkflowService.ts          # Core workflow management service
-├── plugin.ts                   # Plugin registration and setup
-├── chatCommands.ts             # Command exports
-├── commands/workflow.ts        # /workflow command implementation
-├── index.ts                    # Main exports and schemas
-├── rpc/                        # JSON-RPC endpoints
-│   ├── workflow.ts             # RPC handler
-│   └── schema.ts               # RPC schema definitions
-├── package.json
-└── vitest.config.ts            # Testing configuration
-```
 
 ## Core Components
 
@@ -43,16 +44,16 @@ The main service class that manages workflow execution:
 class WorkflowService implements TokenRingService {
   name = "WorkflowService";
   description = "Manages multi-step agent workflows";
-  
+
   constructor(app: TokenRingApp, workflows: Record<string, WorkflowItem>)
-  
+
   // Service lifecycle
   async run(): Promise<void>
-  
+
   // Workflow management
   getWorkflow(name: string): WorkflowItem | undefined
   listWorkflows(): Array<{ key: string; workflow: WorkflowItem }>
-  
+
   // Agent spawning
   async spawnWorkflow(workflowName: string, { headless }: { headless: boolean }): Promise<Agent>
 }
@@ -86,7 +87,7 @@ The workflow command handles both listing and execution:
 /workflow spawn <name>
 ```
 
-## Usage
+## Usage Examples
 
 ### Basic Integration
 
@@ -101,7 +102,145 @@ const app = new TokenRingApp({
 app.install(workflow);
 ```
 
-### Configuration
+### Commands
+
+#### List Available Workflows
+
+```bash
+/workflow
+```
+
+Displays all configured workflows with their names, descriptions, and step counts.
+
+#### Run Workflow on Current Agent
+
+```bash
+/workflow run <name>
+```
+
+Executes all steps in the specified workflow sequentially on the current agent. Each step is processed through the agent's `handleInput` method.
+
+**Example:**
+```bash
+/workflow run content-pipeline
+```
+
+#### Spawn Agent and Run Workflow
+
+```bash
+/workflow spawn <name>
+```
+
+Creates a new agent of the type specified in the workflow configuration, then executes all workflow steps on that new agent. Output is forwarded back to the parent agent.
+
+**Example:**
+```bash
+/workflow spawn morning-article
+```
+
+### Workflow Step Types
+
+Workflow steps can include any valid agent commands:
+
+#### Tool Commands
+```typescript
+steps: [
+  "/tools enable @tokenring-ai/research/research",
+  "/tools enable @tokenring-ai/websearch/searchNews"
+]
+```
+
+#### Chat Commands
+```typescript
+steps: [
+  "/chat Write morning market analysis",
+  "/chat Generate daily metrics report"
+]
+```
+
+#### Mixed Commands
+```typescript
+steps: [
+  "/tools enable @tokenring-ai/database/query",
+  "/chat Generate daily metrics report",
+  "/chat Send report to team"
+]
+```
+
+### Examples
+
+#### Complete Content Creation Workflow
+
+```javascript
+export default {
+  workflows: {
+    "research-and-write": {
+      name: "Research and Write Article",
+      description: "Complete workflow from research to published article",
+      agentType: "contentWriter",
+      steps: [
+        "/tools enable @tokenring-ai/research/research",
+        "/tools enable @tokenring-ai/websearch/searchNews",
+        "/chat Research latest AI developments",
+        "/chat Write comprehensive article",
+        "/chat Review and edit content",
+        "/chat Publish to blog"
+      ]
+    }
+  }
+};
+
+// Execute with:
+/workflow run research-and-write
+```
+
+#### Multi-Agent Workflow
+
+```javascript
+export default {
+  workflows: {
+    "market-analysis": {
+      name: "Complete Market Analysis",
+      description: "Research, analyze, and report on market trends",
+      agentType: "analyst",
+      steps: [
+        "/tools enable @tokenring-ai/research/research",
+        "/tools enable @tokenring-ai/websearch/searchNews",
+        "/tools enable @tokenring-ai/database/query",
+        "/chat Analyze market data",
+        "/chat Generate comprehensive report"
+      ]
+    }
+  }
+};
+
+// Execute with:
+/workflow spawn market-analysis
+```
+
+#### Headless Workflow Execution
+
+```javascript
+export default {
+  workflows: {
+    "background-data-processing": {
+      name: "Background Data Processing",
+      description: "Process data without user interaction",
+      agentType: "dataProcessor",
+      steps: [
+        "/tools enable @tokenring-ai/database/query",
+        "/chat Process incoming data batches",
+        "/chat Generate summary reports"
+      ]
+    }
+  }
+};
+
+// Execute in background:
+/workflow spawn background-data-processing
+```
+
+## Configuration
 
 Add a `workflows` section to your `.tokenring/config.mjs`:
 
@@ -122,7 +261,7 @@ export default {
     "daily-report": {
       name: "Daily Report Generator",
       description: "Generate and send daily reports",
-      agentType: "reportGenerator", 
+      agentType: "reportGenerator",
       steps: [
         "/tools enable @tokenring-ai/database/query",
         "/chat Generate daily metrics report",
@@ -143,71 +282,6 @@ export default {
     }
   }
 };
-```
-
-## Commands
-
-### List Available Workflows
-
-```bash
-/workflow
-```
-
-Displays all configured workflows with their names, descriptions, and step counts.
-
-### Run Workflow on Current Agent
-
-```bash
-/workflow run <name>
-```
-
-Executes all steps in the specified workflow sequentially on the current agent. Each step is processed through the AgentCommandService, allowing for complex command chains.
-
-**Example:**
-```bash
-/workflow run content-pipeline
-```
-
-### Spawn Agent and Run Workflow
-
-```bash
-/workflow spawn <name>
-```
-
-Creates a new agent of the type specified in the workflow configuration, then executes all workflow steps on that new agent.
-
-**Example:**
-```bash
-/workflow spawn morning-article
-```
-
-## Workflow Step Types
-
-Workflow steps can include any valid agent commands:
-
-### Tool Commands
-```typescript
-steps: [
-  "/tools enable @tokenring-ai/research/research",
-  "/tools enable @tokenring-ai/websearch/searchNews"
-]
-```
-
-### Chat Commands
-```typescript
-steps: [
-  "/chat Write morning market analysis",
-  "/chat Generate daily metrics report"
-]
-```
-
-### Mixed Commands
-```typescript
-steps: [
-  "/tools enable @tokenring-ai/database/query",
-  "/chat Generate daily metrics report",
-  "/chat Send report to team"
-]
 ```
 
 ## API Reference
@@ -257,30 +331,36 @@ WorkflowItemSchema = z.object({
 
 ### JSON-RPC API
 
+The workflow package provides JSON-RPC endpoints under `/rpc/workflow`:
+
 #### Endpoints
 
-- `listWorkflows`: Query all available workflows
-- `getWorkflow`: Get specific workflow by name
-- `spawnWorkflow`: Spawn new agent and run workflow
+| Method | Type | Input | Output |
+|--------|------|-------|--------|
+| `listWorkflows` | query | `{}` | Array of workflow objects |
+| `getWorkflow` | query | `{name: string}` | Single workflow object |
+| `spawnWorkflow` | mutation | `{workflowName: string, headless?: boolean}` | Agent info object |
 
 #### Example Usage
 
 ```typescript
 import { createJsonRPCEndpoint } from "@tokenring-ai/web-host/jsonrpc/createJsonRPCEndpoint";
+import WorkflowRpcSchema from "./rpc/schema.ts";
+import WorkflowService from "./WorkflowService.ts";
 
 // Create JSON-RPC endpoint
 const workflowRpc = createJsonRPCEndpoint(WorkflowRpcSchema, {
-  listWorkflows(args, app) {
+  async listWorkflows(args, app) {
     const workflowService = app.requireService(WorkflowService);
     return workflowService.listWorkflows();
   },
-  
-  getWorkflow(args, app) {
+
+  async getWorkflow(args, app) {
     const workflowService = app.requireService(WorkflowService);
     return workflowService.getWorkflow(args.name);
   },
-  
-  spawnWorkflow(args, app) {
+
+  async spawnWorkflow(args, app) {
     const workflowService = app.requireService(WorkflowService);
     return workflowService.spawnWorkflow(args.workflowName, args);
   }
@@ -296,8 +376,8 @@ const agent = await workflowRpc.spawnWorkflow({ workflowName: "morning-article",
 
 The workflow package integrates with several TokenRing services:
 
-- **AgentCommandService**: Executes individual workflow steps
-- **Agent System**: Supports both current agent execution and agent spawning
+- **AgentCommandService**: Registers chat commands for workflow interaction
+- **Agent System**: Supports both current agent execution and agent spawning via `runSubAgent`
 - **Plugin System**: Auto-registers with the TokenRing application
 - **Configuration System**: Validates workflow configuration through Zod schemas
 - **WebHostService**: Provides JSON-RPC endpoints for remote access
@@ -307,12 +387,12 @@ The workflow package integrates with several TokenRing services:
 
 1. **Workflow Selection**: User specifies workflow name via `/workflow run` or `/workflow spawn`
 2. **Validation**: Workflow existence and configuration validation
-3. **Agent Resolution**: 
+3. **Agent Resolution**:
    - `run`: Uses current agent
    - `spawn`: Creates new agent with specified type
-4. **Step Execution**: Sequential execution of all workflow steps
-5. **Command Processing**: Each step processed through AgentCommandService
-6. **Output Forwarding**: Results forwarded back to parent agent when spawning
+4. **Step Execution**: Sequential execution of all workflow steps via `agent.handleInput()`
+5. **Command Processing**: Each step processed through the agent's input handler
+6. **Output Forwarding**: Results forwarded back to parent agent when spawning (chat, reasoning, human requests, system output)
 
 ## Error Handling
 
@@ -321,86 +401,6 @@ The workflow package integrates with several TokenRing services:
 - **Step Execution**: Individual step failures are reported but don't stop workflow execution
 - **Agent Spawning**: Proper error handling for agent creation failures
 
-## Examples
-
-### Complete Content Creation Workflow
-
-```javascript
-export default {
-  workflows: {
-    "research-and-write": {
-      name: "Research and Write Article",
-      description: "Complete workflow from research to published article",
-      agentType: "contentWriter",
-      steps: [
-        "/tools enable @tokenring-ai/research/research",
-        "/tools enable @tokenring-ai/websearch/searchNews",
-        "/chat Research latest AI developments",
-        "/chat Write comprehensive article",
-        "/chat Review and edit content",
-        "/chat Publish to blog"
-      ]
-    }
-  }
-};
-
-// Execute with:
-/workflow run research-and-write
-```
-
-### Multi-Agent Workflow
-
-```javascript
-export default {
-  workflows: {
-    "market-analysis": {
-      name: "Complete Market Analysis",
-      description: "Research, analyze, and report on market trends",
-      agentType: "analyst",
-      steps: [
-        "/tools enable @tokenring-ai/research/research",
-        "/tools enable @tokenring-ai/websearch/searchNews",
-        "/tools enable @tokenring-ai/database/query",
-        "/chat Analyze market data",
-        "/chat Generate comprehensive report"
-      ]
-    }
-  }
-};
-
-// Execute with:
-/workflow spawn market-analysis
-```
-
-### Headless Workflow Execution
-
-```javascript
-export default {
-  workflows: {
-    "background-data-processing": {
-      name: "Background Data Processing",
-      description: "Process data without user interaction",
-      agentType: "dataProcessor",
-      steps: [
-        "/tools enable @tokenring-ai/database/query",
-        "/chat Process incoming data batches",
-        "/chat Generate summary reports"
-      ]
-    }
-  }
-};
-
-// Execute in background:
-/workflow spawn background-data-processing
-```
-
-## Dependencies
-
-- **@tokenring-ai/app**: Base application framework and service management
-- **@tokenring-ai/agent**: Agent system and command execution
-- **@tokenring-ai/web-host**: WebSocket server and JSON-RPC support
-- **zod**: Schema validation and type safety
-
 ## License
 
-MIT License - see LICENSE file for details.
+MIT License - see [LICENSE](./LICENSE) file for details.
