@@ -83,23 +83,25 @@ describe('workflow command', () => {
 
   describe('execute() with "run" command', () => {
     it('should execute workflow steps', async () => {
+      vi.spyOn(agent, 'handleInput');
       await workflowCommand.execute('run testWorkflow', agent);
 
       expect(agent.infoLine).toHaveBeenCalledWith('Running workflow: Test Workflow\n');
-      expect(agentCommandService.executeAgentCommand).toHaveBeenCalledTimes(3);
-      expect(agentCommandService.executeAgentCommand).toHaveBeenCalledWith(agent, 'step1');
-      expect(agentCommandService.executeAgentCommand).toHaveBeenCalledWith(agent, 'step2');
-      expect(agentCommandService.executeAgentCommand).toHaveBeenCalledWith(agent, 'step3');
+      expect(agent.handleInput).toHaveBeenCalledTimes(3);
+      expect(agent.handleInput).toHaveBeenCalledWith({message: 'step1'});
+      expect(agent.handleInput).toHaveBeenCalledWith({message: 'step2'});
+      expect(agent.handleInput).toHaveBeenCalledWith({message: 'step3'});
     });
 
     it('should handle complex workflow steps', async () => {
+      vi.spyOn(agent, 'handleInput');
       await workflowCommand.execute('run complexWorkflow', agent);
 
-      expect(agentCommandService.executeAgentCommand).toHaveBeenCalledTimes(4);
-      expect(agentCommandService.executeAgentCommand).toHaveBeenCalledWith(agent, 'setup');
-      expect(agentCommandService.executeAgentCommand).toHaveBeenCalledWith(agent, 'process');
-      expect(agentCommandService.executeAgentCommand).toHaveBeenCalledWith(agent, 'validate');
-      expect(agentCommandService.executeAgentCommand).toHaveBeenCalledWith(agent, 'cleanup');
+      expect(agent.handleInput).toHaveBeenCalledTimes(4);
+      expect(agent.handleInput).toHaveBeenCalledWith({message: 'setup'});
+      expect(agent.handleInput).toHaveBeenCalledWith({message: 'process'});
+      expect(agent.handleInput).toHaveBeenCalledWith({message: 'validate'});
+      expect(agent.handleInput).toHaveBeenCalledWith({message: 'cleanup'});
     });
 
     it('should show error for non-existent workflow', async () => {
@@ -133,11 +135,12 @@ describe('workflow command', () => {
       appWithMultiWord.addServices(multiWordCommandService as any);
       const agentWithMultiWord = createTestingAgent(appWithMultiWord);
       vi.spyOn(agentWithMultiWord, 'infoLine');
+      vi.spyOn(agentWithMultiWord, 'handleInput');
 
       await workflowCommand.execute('run multi word workflow', agentWithMultiWord);
 
       expect(agentWithMultiWord.infoLine).toHaveBeenCalledWith('Running workflow: Multi Word Workflow\n');
-      expect(multiWordCommandService.executeAgentCommand).toHaveBeenCalled();
+      expect(agentWithMultiWord.handleInput).toHaveBeenCalled();
     });
   });
 
@@ -226,12 +229,13 @@ describe('workflow command', () => {
 
   describe('Integration scenarios', () => {
     it('should handle full workflow execution flow', async () => {
+      vi.spyOn(agent, 'handleInput')
       await workflowCommand.execute('run testWorkflow', agent);
 
       expect(agent.infoLine).toHaveBeenCalledWith('Running workflow: Test Workflow\n');
-      expect(agentCommandService.executeAgentCommand).toHaveBeenCalledWith(agent, 'step1');
-      expect(agentCommandService.executeAgentCommand).toHaveBeenCalledWith(agent, 'step2');
-      expect(agentCommandService.executeAgentCommand).toHaveBeenCalledWith(agent, 'step3');
+      expect(agent.handleInput).toHaveBeenCalledWith({message: 'step1'});
+      expect(agent.handleInput).toHaveBeenCalledWith({message: 'step2'});
+      expect(agent.handleInput).toHaveBeenCalledWith({message: 'step3'});
     });
 
     it('should handle full workflow spawn flow', async () => {
