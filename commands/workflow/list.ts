@@ -1,19 +1,22 @@
 import Agent from "@tokenring-ai/agent/Agent";
+import indent from "@tokenring-ai/utility/string/indent";
 import WorkflowService from "../../WorkflowService.js";
 
 export default async function defaultCmd(_remainder: string, agent: Agent): Promise<void> {
   const workflowService = agent.app.getService(WorkflowService);
   
   if (!workflowService) {
-    agent.infoLine("Workflow service is not running.");
+    agent.infoMessage("Workflow service is not running.");
     return;
   }
 
-  agent.infoLine("Available workflows:\n");
+  agent.infoMessage("Available workflows:\n");
   const workflows = workflowService.listWorkflows();
   for (const {key, workflow} of workflows) {
-    agent.infoLine(`**${key}**: ${workflow.name}`);
-    agent.infoLine(`  ${workflow.description}`);
-    agent.infoLine(`  Steps: ${workflow.steps.length}\n`);
+    agent.infoMessage(`**${key}**: ${workflow.name}`);
+    agent.infoMessage(indent([
+      workflow.description,
+      `Steps: ${workflow.steps.length}\n`
+    ], 1));
   }
 }

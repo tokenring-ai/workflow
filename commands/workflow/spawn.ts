@@ -6,23 +6,23 @@ export default async function spawn(remainder: string, agent: Agent): Promise<vo
   const workflowService = agent.app.getService(WorkflowService);
   
   if (!workflowService) {
-    agent.infoLine("Workflow service is not running.");
+    agent.infoMessage("Workflow service is not running.");
     return;
   }
 
   const workflowName = remainder.trim();
   if (!workflowName) {
-    agent.infoLine("Usage: /workflow spawn <name>");
+    agent.infoMessage("Usage: /workflow spawn <name>");
     return;
   }
 
   const workflow = workflowService.getWorkflow(workflowName);
   if (!workflow) {
-    agent.infoLine(`Workflow "${workflowName}" not found.`);
+    agent.infoMessage(`Workflow "${workflowName}" not found.`);
     return;
   }
 
-  agent.infoLine(`Spawning agent type "${workflow.agentType}" for workflow: ${workflow.name}\n`);
+  agent.infoMessage(`Spawning agent type "${workflow.agentType}" for workflow: ${workflow.name}\n`);
 
   await runSubAgent({
     agentType: workflow.agentType,
