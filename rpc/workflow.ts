@@ -1,5 +1,5 @@
 import TokenRingApp from "@tokenring-ai/app";
-import { createJsonRPCEndpoint } from "@tokenring-ai/web-host/jsonrpc/createJsonRPCEndpoint";
+import {createJsonRPCEndpoint} from "@tokenring-ai/web-host/jsonrpc/createJsonRPCEndpoint";
 import WorkflowService from "../WorkflowService.js";
 import WorkflowRpcSchema from "./schema.ts";
 

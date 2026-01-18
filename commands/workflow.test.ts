@@ -1,11 +1,11 @@
+import {AgentCommandService} from '@tokenring-ai/agent';
 import {runSubAgent} from "@tokenring-ai/agent/runSubAgent";
-import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
-import workflowCommand from './workflow';
-import { AgentCommandService } from '@tokenring-ai/agent';
 import createTestingAgent from '@tokenring-ai/agent/test/createTestingAgent';
 import TokenRingApp from '@tokenring-ai/app';
 import createTestingApp from '@tokenring-ai/app/test/createTestingApp';
+import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
 import WorkflowService from '../WorkflowService';
+import workflowCommand from './workflow';
 
 vi.mock('@tokenring-ai/agent/runSubAgent');
 

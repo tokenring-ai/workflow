@@ -1,5 +1,5 @@
 import {JsonRPCSchema} from "@tokenring-ai/web-host/jsonrpc/types";
-import { z } from "zod";
+import {z} from "zod";
 
 export default {
   path: "/rpc/workflow",
