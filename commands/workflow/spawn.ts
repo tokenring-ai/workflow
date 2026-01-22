@@ -28,9 +28,5 @@ export default async function spawn(remainder: string, agent: Agent): Promise<vo
     agentType: workflow.agentType,
     command: `/workflow run ${workflowName}`,
     headless: agent.headless,
-    forwardChatOutput: true,
-    forwardReasoning: true,
-    forwardHumanRequests: true,
-    forwardSystemOutput: true
   }, agent, true);
 }
