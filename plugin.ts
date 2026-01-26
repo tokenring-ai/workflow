@@ -1,5 +1,6 @@
 import {AgentCommandService} from "@tokenring-ai/agent";
 import {TokenRingPlugin} from "@tokenring-ai/app";
+import {RpcService} from "@tokenring-ai/rpc";
 import {WebHostService} from "@tokenring-ai/web-host";
 import JsonRpcResource from "@tokenring-ai/web-host/JsonRpcResource";
 import {z} from "zod";
@@ -24,8 +25,8 @@ export default {
     const workflowService = new WorkflowService(app, config.workflows);
     app.addServices(workflowService);
 
-    app.waitForService(WebHostService, webHostService => {
-      webHostService.registerResource("Workflow RPC endpoint", new JsonRpcResource(app, workflowRPC));
+    app.waitForService(RpcService, rpcService => {
+      rpcService.registerEndpoint(workflowRPC);
     });
   },
   config: packageConfigSchema

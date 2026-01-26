@@ -1,9 +1,9 @@
 import TokenRingApp from "@tokenring-ai/app";
-import {createJsonRPCEndpoint} from "@tokenring-ai/web-host/jsonrpc/createJsonRPCEndpoint";
+import {createRPCEndpoint} from "@tokenring-ai/rpc/createRPCEndpoint";
 import WorkflowService from "../WorkflowService.js";
 import WorkflowRpcSchema from "./schema.ts";
 
-export default createJsonRPCEndpoint(WorkflowRpcSchema, {
+export default createRPCEndpoint(WorkflowRpcSchema, {
   async listWorkflows(args, app: TokenRingApp) {
     const workflowService = app.requireService(WorkflowService);
     const workflows = workflowService.listWorkflows();

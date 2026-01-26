@@ -1,7 +1,8 @@
-import {JsonRPCSchema} from "@tokenring-ai/web-host/jsonrpc/types";
+import {RPCSchema} from "@tokenring-ai/rpc/types";
 import {z} from "zod";
 
 export default {
+  name: "Workflow RPC",
   path: "/rpc/workflow",
   methods: {
     listWorkflows: {
@@ -41,4 +42,4 @@ export default {
       })
     }
   }
-} satisfies JsonRPCSchema;
+} satisfies RPCSchema;
