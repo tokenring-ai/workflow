@@ -1,17 +1,15 @@
 import {AgentCommandService} from "@tokenring-ai/agent";
 import {TokenRingPlugin} from "@tokenring-ai/app";
 import {RpcService} from "@tokenring-ai/rpc";
-import {WebHostService} from "@tokenring-ai/web-host";
-import JsonRpcResource from "@tokenring-ai/web-host/JsonRpcResource";
 import {z} from "zod";
 import chatCommands from "./chatCommands.ts";
-import {WorkflowConfigSchema} from "./index.ts";
 import packageJSON from "./package.json" with {type: "json"};
 import workflowRPC from "./rpc/workflow";
+import {WorkflowConfigSchema} from "./schema.ts";
 import WorkflowService from "./WorkflowService";
 
 const packageConfigSchema = z.object({
-  workflows: WorkflowConfigSchema
+  workflows: WorkflowConfigSchema.prefault({})
 });
 
 export default {

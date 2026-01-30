@@ -2,24 +2,16 @@ import {Agent, AgentManager} from "@tokenring-ai/agent";
 import TokenRingApp from "@tokenring-ai/app";
 import {TokenRingService} from "@tokenring-ai/app/types";
 import {z} from "zod";
-
-export const WorkflowItemSchema = z.object({
-  name: z.string(),
-  description: z.string(),
-  agentType: z.string(),
-  steps: z.array(z.string()),
-});
+import {type ParsedWorkflowConfig, WorkflowItemSchema} from "./schema.ts";
 
 export type WorkflowItem = z.infer<typeof WorkflowItemSchema>;
 
 export default class WorkflowService implements TokenRingService {
   name = "WorkflowService";
   description = "Manages multi-step agent workflows";
-  
-  private app: TokenRingApp;
-  private workflows: Map<string, WorkflowItem>;
+  workflows: Map<string, WorkflowItem>;
 
-  constructor(app: TokenRingApp, workflows: Record<string, WorkflowItem>) {
+  constructor(private app: TokenRingApp, workflows: ParsedWorkflowConfig) {
     this.app = app;
     this.workflows = new Map(
       Object.entries(workflows).map(([key, workflow]) => [
