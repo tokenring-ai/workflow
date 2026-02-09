@@ -7,7 +7,7 @@ import {type ParsedWorkflowConfig, WorkflowItemSchema} from "./schema.ts";
 export type WorkflowItem = z.infer<typeof WorkflowItemSchema>;
 
 export default class WorkflowService implements TokenRingService {
-  name = "WorkflowService";
+  readonly name = "WorkflowService";
   description = "Manages multi-step agent workflows";
   workflows: Map<string, WorkflowItem>;
 
@@ -19,10 +19,6 @@ export default class WorkflowService implements TokenRingService {
         WorkflowItemSchema.parse(workflow)
       ])
     );
-  }
-
-  async run(): Promise<void> {
-    this.app.serviceOutput(`[WorkflowService] Loaded ${this.workflows.size} workflows`);
   }
 
   getWorkflow(name: string): WorkflowItem | undefined {
