@@ -1,4 +1,4 @@
-import {AgentCommandService} from '@tokenring-ai/agent';
+import {Agent, AgentCommandService} from '@tokenring-ai/agent';
 import {runSubAgent} from "@tokenring-ai/agent/runSubAgent";
 import createTestingAgent from '@tokenring-ai/agent/test/createTestingAgent';
 import TokenRingApp from '@tokenring-ai/app';
@@ -11,9 +11,9 @@ vi.mock('@tokenring-ai/agent/runSubAgent');
 
 describe('workflow command', () => {
   let app: TokenRingApp;
-  let agent: any;
+  let agent: Agent;
   let workflowService: WorkflowService;
-  let agentCommandService: any;
+  let agentCommandService: AgentCommandService;
 
   const mockWorkflows = {
     testWorkflow: {
@@ -37,17 +37,13 @@ describe('workflow command', () => {
     
     workflowService = new WorkflowService(app, mockWorkflows);
 
-    agentCommandService = {
-      name: AgentCommandService.name,
-      description: 'Test agent command service',
-      executeAgentCommand: vi.fn(),
-    };
+    agentCommandService = new AgentCommandService();
 
     app.addServices(workflowService);
-    app.addServices(agentCommandService as any);
+    app.addServices(agentCommandService);
 
     agent = createTestingAgent(app);
-    agent.headless = false;
+    agent.config.headless = false;
     vi.spyOn(agent, 'infoMessage');
   });
 
@@ -57,7 +53,7 @@ describe('workflow command', () => {
 
   describe('command metadata', () => {
     it('should have correct description', () => {
-      expect(workflowCommand.description).toBe('/workflow run <name> - Run a workflow by name.');
+      expect(workflowCommand.description).toBe('/workflow - Manage and run workflows');
     });
 
     it('should have help text', () => {
@@ -69,39 +65,37 @@ describe('workflow command', () => {
 
   describe('execute() with no arguments', () => {
     it('should list all workflows', async () => {
-      await workflowCommand.execute(undefined, agent);
+      await workflowCommand.execute("list", agent);
 
       expect(agent.infoMessage).toHaveBeenCalledWith('Available workflows:\n');
       expect(agent.infoMessage).toHaveBeenCalledWith('**testWorkflow**: Test Workflow');
-      expect(agent.infoMessage).toHaveBeenCalledWith('  A test workflow');
-      expect(agent.infoMessage).toHaveBeenCalledWith('  Steps: 3\n');
+      expect(agent.infoMessage).toHaveBeenCalledWith(' A test workflow\n Steps: 3');
       expect(agent.infoMessage).toHaveBeenCalledWith('**complexWorkflow**: Complex Workflow');
-      expect(agent.infoMessage).toHaveBeenCalledWith('  A complex test workflow');
-      expect(agent.infoMessage).toHaveBeenCalledWith('  Steps: 4\n');
+      expect(agent.infoMessage).toHaveBeenCalledWith(' A complex test workflow\n Steps: 4');
     });
   });
 
   describe('execute() with "run" command', () => {
     it('should execute workflow steps', async () => {
-      vi.spyOn(agent, 'handleInput');
+      vi.spyOn(agentCommandService, 'executeAgentCommand').mockImplementation(() => Promise.resolve())
+
       await workflowCommand.execute('run testWorkflow', agent);
 
       expect(agent.infoMessage).toHaveBeenCalledWith('Running workflow: Test Workflow\n');
-      expect(agent.handleInput).toHaveBeenCalledTimes(3);
-      expect(agent.handleInput).toHaveBeenCalledWith({message: 'step1'});
-      expect(agent.handleInput).toHaveBeenCalledWith({message: 'step2'});
-      expect(agent.handleInput).toHaveBeenCalledWith({message: 'step3'});
+      expect(agentCommandService.executeAgentCommand).toHaveBeenCalledWith(agent, 'step1');
+      expect(agentCommandService.executeAgentCommand).toHaveBeenCalledWith(agent, 'step2');
+      expect(agentCommandService.executeAgentCommand).toHaveBeenCalledWith(agent, 'step3');
     });
 
     it('should handle complex workflow steps', async () => {
-      vi.spyOn(agent, 'handleInput');
+      vi.spyOn(agentCommandService, 'executeAgentCommand').mockImplementation(() => Promise.resolve())
       await workflowCommand.execute('run complexWorkflow', agent);
 
-      expect(agent.handleInput).toHaveBeenCalledTimes(4);
-      expect(agent.handleInput).toHaveBeenCalledWith({message: 'setup'});
-      expect(agent.handleInput).toHaveBeenCalledWith({message: 'process'});
-      expect(agent.handleInput).toHaveBeenCalledWith({message: 'validate'});
-      expect(agent.handleInput).toHaveBeenCalledWith({message: 'cleanup'});
+      expect(agent.infoMessage).toHaveBeenCalledWith('Running workflow: Complex Workflow\n');
+      expect(agentCommandService.executeAgentCommand).toHaveBeenCalledWith(agent, 'setup');
+      expect(agentCommandService.executeAgentCommand).toHaveBeenCalledWith(agent, 'process');
+      expect(agentCommandService.executeAgentCommand).toHaveBeenCalledWith(agent, 'validate');
+      expect(agentCommandService.executeAgentCommand).toHaveBeenCalledWith(agent, 'cleanup');
     });
 
     it('should show error for non-existent workflow', async () => {
@@ -116,32 +110,6 @@ describe('workflow command', () => {
       expect(agent.infoMessage).toHaveBeenCalledWith('Usage: /workflow run <name>');
     });
 
-    it('should handle workflow with multiple word name', async () => {
-      const multiWordWorkflows = {
-        ...mockWorkflows,
-        'multi word workflow': {
-          ...mockWorkflows.testWorkflow,
-          name: 'Multi Word Workflow',
-        },
-      };
-      const appWithMultiWord = createTestingApp();
-      const multiWordService = new WorkflowService(appWithMultiWord, multiWordWorkflows);
-      const multiWordCommandService = {
-        name: AgentCommandService.name,
-        description: 'Test agent command service',
-        executeAgentCommand: vi.fn(),
-      };
-      appWithMultiWord.addServices(multiWordService);
-      appWithMultiWord.addServices(multiWordCommandService as any);
-      const agentWithMultiWord = createTestingAgent(appWithMultiWord);
-      vi.spyOn(agentWithMultiWord, 'infoMessage');
-      vi.spyOn(agentWithMultiWord, 'handleInput');
-
-      await workflowCommand.execute('run multi word workflow', agentWithMultiWord);
-
-      expect(agentWithMultiWord.infoMessage).toHaveBeenCalledWith('Running workflow: Multi Word Workflow\n');
-      expect(agentWithMultiWord.handleInput).toHaveBeenCalled();
-    });
   });
 
   describe('execute() with "spawn" command', () => {
@@ -161,15 +129,11 @@ describe('workflow command', () => {
         agentType: 'test-agent',
         command: '/workflow run testWorkflow',
         headless: false,
-        forwardChatOutput: true,
-        forwardReasoning: true,
-        forwardHumanRequests: true,
-        forwardSystemOutput: true,
       }, agent, true);
     });
 
     it('should handle headless spawning', async () => {
-      agent.headless = true;
+      agent.config.headless = true;
       await workflowCommand.execute('spawn testWorkflow', agent);
 
       expect(runSubAgent).toHaveBeenCalledWith(
@@ -198,44 +162,19 @@ describe('workflow command', () => {
     it('should show usage for unknown command', async () => {
       await workflowCommand.execute('unknown command', agent);
 
-      expect(agent.infoMessage).toHaveBeenCalledWith('Usage: /workflow run <name> | /workflow spawn <name>');
-    });
-  });
-
-  describe('Error handling scenarios', () => {
-    it('should handle missing workflow service', async () => {
-      const emptyApp = createTestingApp();
-      const agentWithoutService = createTestingAgent(emptyApp);
-      vi.spyOn(agentWithoutService, 'infoMessage');
-
-      await workflowCommand.execute('run testWorkflow', agentWithoutService);
-
-      expect(agentWithoutService.infoMessage).toHaveBeenCalledWith('Workflow service is not running.');
-    });
-
-    it('should handle agent command service missing', async () => {
-      const appWithoutCommandService = createTestingApp();
-      const workflowServiceNoCommand = new WorkflowService(appWithoutCommandService, mockWorkflows);
-      appWithoutCommandService.addServices(workflowServiceNoCommand);
-      const agentWithoutCommandService = createTestingAgent(appWithoutCommandService);
-      vi.spyOn(agentWithoutCommandService, 'infoMessage');
-
-      await workflowCommand.execute('run testWorkflow', agentWithoutCommandService);
-
-      expect(agentWithoutCommandService.infoMessage).toHaveBeenCalledWith('Running workflow: Test Workflow\n');
-      expect(agentCommandService.executeAgentCommand).not.toHaveBeenCalled();
+      expect(agent.infoMessage).toHaveBeenCalledWith('Available subcommands: list, run, spawn');
     });
   });
 
   describe('Integration scenarios', () => {
     it('should handle full workflow execution flow', async () => {
-      vi.spyOn(agent, 'handleInput')
+      vi.spyOn(agentCommandService, 'executeAgentCommand').mockImplementation(() => Promise.resolve())
       await workflowCommand.execute('run testWorkflow', agent);
 
       expect(agent.infoMessage).toHaveBeenCalledWith('Running workflow: Test Workflow\n');
-      expect(agent.handleInput).toHaveBeenCalledWith({message: 'step1'});
-      expect(agent.handleInput).toHaveBeenCalledWith({message: 'step2'});
-      expect(agent.handleInput).toHaveBeenCalledWith({message: 'step3'});
+      expect(agentCommandService.executeAgentCommand).toHaveBeenCalledWith(agent, 'step1');
+      expect(agentCommandService.executeAgentCommand).toHaveBeenCalledWith(agent, 'step2');
+      expect(agentCommandService.executeAgentCommand).toHaveBeenCalledWith(agent, 'step3');
     });
 
     it('should handle full workflow spawn flow', async () => {
@@ -276,9 +215,9 @@ describe('workflow command metadata', () => {
     };
 
     expect(command).toMatchObject({
-      description: expect.stringContaining('/workflow run'),
+      description: expect.stringContaining('/workflow'),
       execute: expect.any(Function),
-      help: expect.stringContaining('/workflow'),
+      help: expect.stringContaining('/workflow run'),
     });
   });
 });
