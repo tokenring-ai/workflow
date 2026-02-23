@@ -1,37 +1,34 @@
 import {AgentCommandService} from "@tokenring-ai/agent";
 import Agent from "@tokenring-ai/agent/Agent";
+import {CommandFailedError} from "@tokenring-ai/agent/AgentError";
 import WorkflowService from "../../WorkflowService.js";
 
-export default async function run(remainder: string, agent: Agent): Promise<void> {
+export default async function run(remainder: string, agent: Agent): Promise<string> {
   const workflowService = agent.requireServiceByType(WorkflowService);
   
   if (!workflowService) {
-    agent.infoMessage("Workflow service is not running.");
-    return;
+    return "Workflow service is not running.";
   }
 
   const workflowName = remainder.trim();
   if (!workflowName) {
-    agent.infoMessage("Usage: /workflow run <name>");
-    return;
+    throw new CommandFailedError("Usage: /workflow run <name>");
   }
 
   const workflow = workflowService.getWorkflow(workflowName);
   if (!workflow) {
-    agent.infoMessage(`Workflow "${workflowName}" not found.`);
-    return;
+    throw new CommandFailedError(`Workflow "${workflowName}" not found.`);
   }
-
-  agent.infoMessage(`Running workflow: ${workflow.name}\n`);
 
   const agentCommandService = agent.requireServiceByType(AgentCommandService);
 
   const signal = agent.getAbortSignal();
   for (const message of workflow.steps) {
     if (signal.aborted) {
-      agent.warningMessage("Workflow was aborted.");
-      return;
+      return "Workflow was aborted.";
     }
     await agentCommandService.executeAgentCommand(agent, message);
   }
+
+  return `Workflow "${workflowName}" completed`;
 }
