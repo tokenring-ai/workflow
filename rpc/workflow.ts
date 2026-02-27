@@ -41,7 +41,7 @@ export default createRPCEndpoint(WorkflowRpcSchema, {
 
     return {
       id: agent.id,
-      name: agent.name,
+      name: agent.displayName,
       description: agent.config.description,
     };
   },

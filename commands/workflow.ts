@@ -27,6 +27,7 @@ Run multi-step workflows on the current agent.
 /workflow spawn myWorkflow`;
 
 export default {
+  name: "workflow",
   description,
   execute,
   help,
