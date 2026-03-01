@@ -22,7 +22,9 @@ export default async function spawn(remainder: string, agent: Agent): Promise<st
 
   await runSubAgent({
     agentType: workflow.agentType,
-    command: `/workflow run ${workflowName}`,
+    input: {
+      message: `/workflow run ${workflowName}`,
+    },
     headless: agent.headless,
   }, agent, true);
 
