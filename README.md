@@ -25,7 +25,6 @@ Then, in your TokenRing application, install the workflow plugin.
 - **Interactive Commands**: `/workflow` chat command with subcommands (`list`, `run`, `spawn`)
 - **Workflow Listing**: Display available workflows with details
 - **Headless Support**: Run workflows in background agents
-- **Output Forwarding**: Forward chat, reasoning, human requests, and system output when spawning agents
 - **Error Handling**: Comprehensive error handling for workflow execution
 - **Comprehensive Testing**: Unit tests for all command implementations
 
@@ -72,11 +71,13 @@ Manage and run workflows on the current agent.
 Run multi-step workflows on the current agent.
 
 ## Usage
-/workflow list             - List available workflows
-/workflow run <name>       - Run a workflow by name on current agent
-/workflow spawn <name>     - Spawn new agent and run workflow
+/workflow              - List available workflows
+/workflow list         - List available workflows
+/workflow run <name>   - Run a workflow by name on current agent
+/workflow spawn <name> - Spawn new agent and run workflow
 
 ## Example
+/workflow
 /workflow run myWorkflow
 /workflow spawn myWorkflow
 ```
@@ -409,14 +410,13 @@ The workflow package integrates with several TokenRing services:
    - `spawn`: Creates new agent with specified type via `runSubAgent`
 4. **Step Execution**: Sequential execution of all workflow steps via `agent.handleInput()`
 5. **Command Processing**: Each step processed through the agent's input handler
-6. **Output Forwarding**: Results forwarded back to parent agent when spawning (chat, reasoning, human requests, system output)
-7. **Completion**: Workflow completes when all steps have been executed
+6. **Completion**: Workflow completes when all steps have been executed
 
 ## Error Handling
 
 - **Workflow Not Found**: Clear error message when specified workflow doesn't exist
 - **Configuration Validation**: Schema validation ensures proper workflow structure
-- **Step Execution**: Individual step failures are reported but don't stop workflow execution
+- **Step Execution**: Individual step failures are reported through the agent command system
 - **Agent Spawning**: Proper error handling for agent creation failures
 - **Missing Service**: Clear message when workflow service is not running
 
@@ -484,10 +484,10 @@ pkg/workflow/
 ├── README.md                # This file
 ├── schema.ts                # Zod schema definitions
 ├── WorkflowService.ts       # Core service implementation
-├── chatCommands.ts          # Chat command registry
 ├── vitest.config.ts         # Vitest configuration
+├── commands.ts              # Command registry (exports main workflow command)
 ├── commands/
-│   └── workflow.ts          # Main /workflow command with subcommand router
+│   ├── workflow.ts          # Main /workflow command with subcommand router
 │   └── workflow/
 │       ├── list.ts          # /workflow list implementation
 │       ├── run.ts           # /workflow run implementation
@@ -495,8 +495,8 @@ pkg/workflow/
 ├── rpc/
 │   ├── schema.ts            # JSON-RPC schema definition
 │   └── workflow.ts          # RPC endpoint implementation
-└── test/
-    └── commands.test.ts     # Unit tests for chat commands
+└── commands/
+    └── workflow.test.ts     # Unit tests for chat commands
 ```
 
 ## Dependencies

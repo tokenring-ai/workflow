@@ -1,24 +1,27 @@
 import Agent from "@tokenring-ai/agent/Agent";
+import {TokenRingAgentCommand} from "@tokenring-ai/agent/types";
 import indent from "@tokenring-ai/utility/string/indent";
 import WorkflowService from "../../WorkflowService.js";
 
-export default async function defaultCmd(_remainder: string, agent: Agent): Promise<string> {
-  const workflowService = agent.app.getService(WorkflowService);
-  
-  if (!workflowService) {
-    return "Workflow service is not running.";
-  }
+export default {
+  name: "workflow list",
+  description: "/workflow list - List available workflows",
+  help: `# /workflow list
 
-  const workflows = workflowService.listWorkflows();
-  const lines: string[] = ["Available workflows:"];
-  
-  for (const {key, workflow} of workflows) {
-    lines.push(`**${key}**: ${workflow.name}`);
-    lines.push(indent([
-      workflow.description,
-      `Steps: ${workflow.steps.length}`
-    ], 1));
-  }
+List all available workflows with their names, descriptions, and step counts.
 
-  return lines.join("\n");
-}
+## Example
+
+/workflow list`,
+  execute: async (_remainder: string, agent: Agent): Promise<string> => {
+    const workflowService = agent.app.getService(WorkflowService);
+    if (!workflowService) return "Workflow service is not running.";
+    const workflows = workflowService.listWorkflows();
+    const lines = ["Available workflows:"];
+    for (const {key, workflow} of workflows) {
+      lines.push(`**${key}**: ${workflow.name}`);
+      lines.push(indent([workflow.description, `Steps: ${workflow.steps.length}`], 1));
+    }
+    return lines.join("\n");
+  },
+} satisfies TokenRingAgentCommand;
