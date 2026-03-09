@@ -26,6 +26,7 @@ Then, in your TokenRing application, install the workflow plugin.
 - **Workflow Listing**: Display available workflows with details
 - **Headless Support**: Run workflows in background agents
 - **Error Handling**: Comprehensive error handling for workflow execution
+- **Abort Support**: Workflow execution can be aborted via agent abort signal
 - **Comprehensive Testing**: Unit tests for all command implementations
 
 ## Chat Commands
@@ -68,7 +69,7 @@ Manage and run workflows on the current agent.
 # /workflow
 
 ## Description
-Run multi-step workflows on the current agent.
+Manage and run workflows on the current agent.
 
 ## Usage
 /workflow              - List available workflows
@@ -408,9 +409,10 @@ The workflow package integrates with several TokenRing services:
 3. **Agent Resolution**:
    - `run`: Uses current agent
    - `spawn`: Creates new agent with specified type via `runSubAgent`
-4. **Step Execution**: Sequential execution of all workflow steps via `agent.handleInput()`
-5. **Command Processing**: Each step processed through the agent's input handler
-6. **Completion**: Workflow completes when all steps have been executed
+4. **Step Execution**: Sequential execution of all workflow steps via `agentCommandService.executeAgentCommand()`
+5. **Command Processing**: Each step processed through the agent command service
+6. **Abort Check**: Each step checks for abort signal before execution
+7. **Completion**: Workflow completes when all steps have been executed
 
 ## Error Handling
 
@@ -419,6 +421,7 @@ The workflow package integrates with several TokenRing services:
 - **Step Execution**: Individual step failures are reported through the agent command system
 - **Agent Spawning**: Proper error handling for agent creation failures
 - **Missing Service**: Clear message when workflow service is not running
+- **Abort Handling**: Workflow can be aborted at any step via agent abort signal
 
 ## Services
 
@@ -473,6 +476,7 @@ bun test --coverage
 - **Error Handling**: Tests for workflow not found scenarios
 - **Input Parsing**: Tests for various input formats and edge cases
 - **Integration**: Full workflow execution flow tests
+- **Command Routing**: Tests for subcommand routing in main workflow command
 
 ## Package Structure
 
@@ -507,7 +511,7 @@ pkg/workflow/
 - `@tokenring-ai/agent` (0.2.0) - Agent orchestration and management
 - `@tokenring-ai/chat` (0.2.0) - Chat service integration
 - `@tokenring-ai/rpc` (0.2.0) - JSON-RPC endpoint management
-- `@tokenring-ai/utility` (0.2.0) - Utility functions and helpers
+- `@tokenring-ai/utility` (0.2.0) - Utility functions and helpers (for `indent` function)
 - `zod` (^4.3.6) - Schema validation
 
 ### Development Dependencies

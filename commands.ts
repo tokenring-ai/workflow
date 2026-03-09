@@ -1,5 +1,5 @@
 import list from './commands/workflow/list.ts';
-import run from './commands/workflow/run.ts';
 import spawn from './commands/workflow/spawn.ts';
+import run from './commands/workflow/run.ts';
 
-export default [list, run, spawn];
+export default [list, spawn, run];

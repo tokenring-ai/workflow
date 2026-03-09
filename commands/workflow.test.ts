@@ -59,7 +59,7 @@ describe('workflow command', () => {
     it('should have help text', () => {
       expect(workflowCommand.help).toContain('# /workflow');
       expect(workflowCommand.help).toContain('## Usage');
-      expect(workflowCommand.help).toContain('Run multi-step workflows on the current agent.');
+      expect(workflowCommand.help).toContain('Manage and run workflows on the current agent.');
     });
   });
 
@@ -172,9 +172,10 @@ describe('workflow command', () => {
   });
 
   describe('execute() with unknown command', () => {
-    it('should show usage for unknown command', async () => {
+    it('should show error for unknown command', async () => {
       const result = await workflowCommand.execute('unknown command', agent);
 
+      expect(result).toContain('Unknown subcommand: unknown');
       expect(result).toContain('Available subcommands: list, run, spawn');
     });
   });
