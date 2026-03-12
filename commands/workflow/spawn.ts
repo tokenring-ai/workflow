@@ -11,7 +11,14 @@ async function execute(remainder: string, agent: Agent): Promise<string> {
   if (!workflowName) throw new CommandFailedError("Usage: /workflow spawn <name>");
   const workflow = workflowService.getWorkflow(workflowName);
   if (!workflow) throw new CommandFailedError(`Workflow "${workflowName}" not found.`);
-  await runSubAgent({ agentType: workflow.agentType, input: { message: `/workflow run ${workflowName}` }, headless: agent.headless }, agent, true);
+  await runSubAgent({
+    agentType: workflow.agentType,
+    input: {
+      from: `Workflow ${workflowName}`,
+      message: `/workflow run ${workflowName}`
+    },
+    headless: agent.headless
+  }, agent, true);
   return `Spawned agent for workflow: ${workflow.name}`;
 }
 
