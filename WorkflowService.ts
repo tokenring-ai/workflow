@@ -44,7 +44,10 @@ export default class WorkflowService implements TokenRingService {
       agentType: workflow.agentType,
       headless,
     });
-    agent.handleInput({message: `/workflow run ${workflowName}`});
+    agent.handleInput({
+      from: `Workflow ${workflowName}`,
+      message: `/workflow run ${workflowName}`
+    });
 
     return agent;
   }
