@@ -22,7 +22,7 @@ Then, in your TokenRing application, install the workflow plugin.
 - **Agent Spawning**: Create new agents of specified types to run workflows
 - **Configuration-driven**: Workflows defined in configuration files with schema validation
 - **JSON-RPC API**: Remote workflow management via WebSocket API
-- **Interactive Commands**: `/workflow` chat command with subcommands (`list`, `run`, `spawn`)
+- **Interactive Commands**: Three chat commands (`/workflow list`, `/workflow run`, `/workflow spawn`)
 - **Workflow Listing**: Display available workflows with details
 - **Headless Support**: Run workflows in background agents
 - **Error Handling**: Comprehensive error handling for workflow execution
@@ -33,53 +33,87 @@ Then, in your TokenRing application, install the workflow plugin.
 
 The workflow package provides the following chat commands:
 
-### `/workflow`
+### `/workflow list`
 
-Manage and run workflows on the current agent.
+List all available workflows.
 
 #### Usage
 
 ```
-/workflow                    # List all available workflows
-/workflow list               # List all available workflows (explicit)
-/workflow run <name>         # Run a workflow by name on current agent
-/workflow spawn <name>       # Spawn new agent and run workflow
+/workflow list
 ```
 
-#### Subcommands
-
-| Command | Description |
-|---------|-------------|
-| `list` | List all available workflows with details |
-| `run <name>` | Execute a workflow by name on the current agent |
-| `spawn <name>` | Spawn a new agent and run the workflow |
-
-#### Examples
+#### Example
 
 ```bash
-/workflow                    # Display all available workflows with their details
-/workflow list               # Display all available workflows with their details
-/workflow run content-pipeline  # Execute the content-pipeline workflow on the current agent
-/workflow spawn morning-article   # Create a new agent and run the morning-article workflow
+/workflow list    # Display all available workflows with their details
 ```
 
 #### Help Text
 
 ```markdown
-# /workflow
+# /workflow list
 
-## Description
-Manage and run workflows on the current agent.
-
-## Usage
-/workflow              - List available workflows
-/workflow list         - List available workflows
-/workflow run <name>   - Run a workflow by name on current agent
-/workflow spawn <name> - Spawn new agent and run workflow
+List all available workflows with their names, descriptions, and step counts.
 
 ## Example
-/workflow
+
+/workflow list
+```
+
+### `/workflow run`
+
+Run a workflow by name on the current agent.
+
+#### Usage
+
+```
+/workflow run <name>
+```
+
+#### Example
+
+```bash
+/workflow run content-pipeline    # Execute the content-pipeline workflow on the current agent
+```
+
+#### Help Text
+
+```markdown
+# /workflow run <name>
+
+Run a workflow by name on the current agent.
+
+## Example
+
 /workflow run myWorkflow
+```
+
+### `/workflow spawn`
+
+Spawn a new agent and run a workflow on it.
+
+#### Usage
+
+```
+/workflow spawn <name>
+```
+
+#### Example
+
+```bash
+/workflow spawn morning-article    # Create a new agent and run the morning-article workflow
+```
+
+#### Help Text
+
+```markdown
+# /workflow spawn <name>
+
+Spawn a new agent and run a workflow on it.
+
+## Example
+
 /workflow spawn myWorkflow
 ```
 
@@ -470,13 +504,12 @@ bun test --coverage
 
 ### Test Coverage
 
-- **Command Implementation**: Tests for list, run, and spawn subcommands
+- **Command Implementation**: Tests for list, run, and spawn commands
 - **Workflow Execution**: Tests for workflow step execution
 - **Agent Spawning**: Tests for runSubAgent integration
 - **Error Handling**: Tests for workflow not found scenarios
 - **Input Parsing**: Tests for various input formats and edge cases
 - **Integration**: Full workflow execution flow tests
-- **Command Routing**: Tests for subcommand routing in main workflow command
 
 ## Package Structure
 
@@ -489,13 +522,12 @@ pkg/workflow/
 ├── schema.ts                # Zod schema definitions
 ├── WorkflowService.ts       # Core service implementation
 ├── vitest.config.ts         # Vitest configuration
-├── commands.ts              # Command registry (exports main workflow command)
+├── commands.ts              # Command registry (exports list, run, spawn commands)
 ├── commands/
-│   ├── workflow.ts          # Main /workflow command with subcommand router
 │   └── workflow/
-│       ├── list.ts          # /workflow list implementation
-│       ├── run.ts           # /workflow run implementation
-│       └── spawn.ts         # /workflow spawn implementation
+│       ├── list.ts          # /workflow list command implementation
+│       ├── run.ts           # /workflow run command implementation
+│       └── spawn.ts         # /workflow spawn command implementation
 ├── rpc/
 │   ├── schema.ts            # JSON-RPC schema definition
 │   └── workflow.ts          # RPC endpoint implementation
@@ -516,7 +548,7 @@ pkg/workflow/
 
 ### Development Dependencies
 
-- `vitest` (^4.0.18) - Testing framework
+- `vitest` (^4.1.0) - Testing framework
 - `typescript` (^5.9.3) - TypeScript compiler
 
 ## License
