@@ -1,14 +1,17 @@
-import Agent from "@tokenring-ai/agent/Agent";
 import {CommandFailedError} from "@tokenring-ai/agent/AgentError";
 import {runSubAgent} from "@tokenring-ai/agent/runSubAgent";
-import {TokenRingAgentCommand} from "@tokenring-ai/agent/types";
+import type {AgentCommandInputSchema, AgentCommandInputType, TokenRingAgentCommand} from "@tokenring-ai/agent/types";
 import WorkflowService from "../../WorkflowService.js";
 
-async function execute(remainder: string, agent: Agent): Promise<string> {
-  const workflowService = agent.app.getService(WorkflowService);
-  if (!workflowService) return "Workflow service is not running.";
-  const workflowName = remainder.trim();
-  if (!workflowName) throw new CommandFailedError("Usage: /workflow spawn <name>");
+const inputSchema = {
+  args: {},
+  positionals: [{name: "workflowName", description: "Workflow name", required: true}],
+  allowAttachments: false,
+} as const satisfies AgentCommandInputSchema;
+
+async function execute({positionals: {workflowName}, agent}: AgentCommandInputType<typeof inputSchema>): Promise<string> {
+  const workflowService = agent.requireServiceByType(WorkflowService);
+
   const workflow = workflowService.getWorkflow(workflowName);
   if (!workflow) throw new CommandFailedError(`Workflow "${workflowName}" not found.`);
   await runSubAgent({
@@ -23,10 +26,13 @@ async function execute(remainder: string, agent: Agent): Promise<string> {
 }
 
 export default {
-  name: "workflow spawn", description: "Spawn a new agent and run a workflow", help: `# /workflow spawn <name>
-
-Spawn a new agent and run a workflow on it.
+  name: "workflow spawn",
+  description: "Spawn a new agent and run a workflow",
+  help: `Spawn a new agent and run a workflow on it.
 
 ## Example
 
-/workflow spawn myWorkflow`, execute } satisfies TokenRingAgentCommand;
+/workflow spawn myWorkflow`,
+  inputSchema,
+  execute,
+} satisfies TokenRingAgentCommand<typeof inputSchema>;
