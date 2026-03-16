@@ -22,7 +22,8 @@ async function execute(remainder: string, agent: Agent): Promise<string> {
   return `Spawned agent for workflow: ${workflow.name}`;
 }
 
-export default { name: "workflow spawn", description: "/workflow spawn - Spawn a new agent and run a workflow", help: `# /workflow spawn <name>
+export default {
+  name: "workflow spawn", description: "Spawn a new agent and run a workflow", help: `# /workflow spawn <name>
 
 Spawn a new agent and run a workflow on it.
 

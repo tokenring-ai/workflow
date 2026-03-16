@@ -19,7 +19,8 @@ async function execute(remainder: string, agent: Agent): Promise<string> {
   return `Workflow "${workflowName}" completed`;
 }
 
-export default { name: "workflow run", description: "/workflow run - Run a workflow by name", help: `# /workflow run <name>
+export default {
+  name: "workflow run", description: "Run a workflow by name", help: `# /workflow run <name>
 
 Run a workflow by name on the current agent.
 

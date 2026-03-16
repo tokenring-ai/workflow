@@ -5,7 +5,7 @@ import WorkflowService from "../../WorkflowService.js";
 
 export default {
   name: "workflow list",
-  description: "/workflow list - List available workflows",
+  description: "List available workflows",
   help: `# /workflow list
 
 List all available workflows with their names, descriptions, and step counts.
