@@ -5,8 +5,7 @@ import WorkflowService from "../../WorkflowService.js";
 
 const inputSchema = {
   args: {},
-  positionals: [{name: "workflowName", description: "Workflow name", required: true}],
-  allowAttachments: false,
+  positionals: [{name: "workflowName", description: "Workflow name", required: true}]
 } as const satisfies AgentCommandInputSchema;
 
 async function execute({positionals: {workflowName}, agent}: AgentCommandInputType<typeof inputSchema>): Promise<string> {
