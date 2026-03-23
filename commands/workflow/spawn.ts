@@ -1,5 +1,5 @@
+import {SubAgentService} from "@tokenring-ai/agent";
 import {CommandFailedError} from "@tokenring-ai/agent/AgentError";
-import {runSubAgent} from "@tokenring-ai/agent/runSubAgent";
 import type {AgentCommandInputSchema, AgentCommandInputType, TokenRingAgentCommand} from "@tokenring-ai/agent/types";
 import WorkflowService from "../../WorkflowService.js";
 
@@ -13,14 +13,17 @@ async function execute({positionals: {workflowName}, agent}: AgentCommandInputTy
 
   const workflow = workflowService.getWorkflow(workflowName);
   if (!workflow) throw new CommandFailedError(`Workflow "${workflowName}" not found.`);
-  await runSubAgent({
+
+  const subAgentService = agent.requireServiceByType(SubAgentService);
+  await subAgentService.runSubAgent({
     agentType: workflow.agentType,
     input: {
       from: `Workflow ${workflowName}`,
       message: `/workflow run ${workflowName}`
     },
-    headless: agent.headless
-  }, agent, true);
+    headless: agent.headless,
+    parentAgent: agent
+  });
   return `Spawned agent for workflow: ${workflow.name}`;
 }
 
