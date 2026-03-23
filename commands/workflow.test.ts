@@ -1,19 +1,19 @@
-import {Agent, AgentCommandService} from '@tokenring-ai/agent';
-import {runSubAgent} from "@tokenring-ai/agent/runSubAgent";
+import {Agent, AgentCommandService, SubAgentService} from '@tokenring-ai/agent';
 import createTestingAgent from '@tokenring-ai/agent/test/createTestingAgent';
 import TokenRingApp from '@tokenring-ai/app';
 import createTestingApp from '@tokenring-ai/app/test/createTestingApp';
 import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
 import WorkflowService from '../WorkflowService';
-import workflowCommand from './commands/workflow';
-
-vi.mock('@tokenring-ai/agent/runSubAgent');
+import workflowRunCommand from './workflow/run.js';
+import workflowSpawnCommand from './workflow/spawn.js';
+import workflowListCommand from './workflow/list.js';
 
 describe('workflow command', () => {
   let app: TokenRingApp;
   let agent: Agent;
   let workflowService: WorkflowService;
   let agentCommandService: AgentCommandService;
+  let subAgentService: SubAgentService;
 
   const mockWorkflows = {
     testWorkflow: {
@@ -37,35 +37,29 @@ describe('workflow command', () => {
     
     workflowService = new WorkflowService(app, mockWorkflows);
 
-    agentCommandService = new AgentCommandService();
+    agentCommandService = new AgentCommandService(app);
+    subAgentService = new SubAgentService(app);
 
     app.addServices(workflowService);
     app.addServices(agentCommandService);
+    app.addServices(subAgentService);
 
     agent = createTestingAgent(app);
     agent.config.headless = false;
     vi.spyOn(agent, 'infoMessage');
+    
+    // Mock getAbortSignal to return a non-aborted signal
+    const abortController = new AbortController();
+    vi.spyOn(agent, 'getAbortSignal').mockReturnValue(abortController.signal);
   });
 
   afterEach(() => {
     vi.restoreAllMocks();
   });
 
-  describe('command metadata', () => {
-    it('should have correct description', () => {
-      expect(workflowCommand.description).toBe('/workflow - Manage and run workflows');
-    });
-
-    it('should have help text', () => {
-      expect(workflowCommand.help).toContain('# /workflow');
-      expect(workflowCommand.help).toContain('## Usage');
-      expect(workflowCommand.help).toContain('Manage and run workflows on the current agent.');
-    });
-  });
-
-  describe('execute() with no arguments', () => {
+  describe('list command', () => {
     it('should list all workflows', async () => {
-      const result = await workflowCommand.execute("", agent);
+      const result = await workflowListCommand.execute({ agent });
 
       expect(result).toContain('Available workflows:');
       expect(result).toContain('**testWorkflow**: Test Workflow');
@@ -77,21 +71,15 @@ describe('workflow command', () => {
     });
   });
 
-  describe('execute() with "list" command', () => {
-    it('should list all workflows', async () => {
-      const result = await workflowCommand.execute("list", agent);
-
-      expect(result).toContain('Available workflows:');
-      expect(result).toContain('**testWorkflow**: Test Workflow');
-      expect(result).toContain('Steps: 3');
-    });
-  });
-
-  describe('execute() with "run" command', () => {
+  describe('run command', () => {
     it('should execute workflow steps', async () => {
       vi.spyOn(agentCommandService, 'executeAgentCommand').mockImplementation(() => Promise.resolve());
 
-      const result = await workflowCommand.execute('run testWorkflow', agent);
+      const result = await workflowRunCommand.execute({ 
+        positionals: { workflowName: 'testWorkflow' }, 
+        args: {}, 
+        agent 
+      });
 
       expect(result).toContain('Workflow "testWorkflow" completed');
       expect(agentCommandService.executeAgentCommand).toHaveBeenCalledWith(agent, 'step1');
@@ -101,7 +89,11 @@ describe('workflow command', () => {
 
     it('should handle complex workflow steps', async () => {
       vi.spyOn(agentCommandService, 'executeAgentCommand').mockImplementation(() => Promise.resolve());
-      const result = await workflowCommand.execute('run complexWorkflow', agent);
+      const result = await workflowRunCommand.execute({ 
+        positionals: { workflowName: 'complexWorkflow' }, 
+        args: {}, 
+        agent 
+      });
 
       expect(result).toContain('Workflow "complexWorkflow" completed');
       expect(agentCommandService.executeAgentCommand).toHaveBeenCalledWith(agent, 'setup');
@@ -111,121 +103,111 @@ describe('workflow command', () => {
     });
 
     it('should show error for non-existent workflow', async () => {
-      const result = await workflowCommand.execute('run nonExistentWorkflow', agent);
-
-      expect(result).toContain('Workflow "nonExistentWorkflow" not found.');
-    });
-
-    it('should show usage when no workflow name provided', async () => {
-      const result = await workflowCommand.execute('run', agent);
-
-      expect(result).toContain('Usage: /workflow run <name>');
+      await expect(workflowRunCommand.execute({ 
+        positionals: { workflowName: 'nonExistentWorkflow' }, 
+        args: {}, 
+        agent 
+      })).rejects.toThrow('Workflow "nonExistentWorkflow" not found.');
     });
   });
 
-  describe('execute() with "spawn" command', () => {
-    beforeEach(async () => {
-      vi.mocked(runSubAgent).mockResolvedValue({
+  describe('spawn command', () => {
+    it('should spawn agent and run workflow', async () => {
+      const mockRunSubAgent = vi.fn().mockResolvedValue({
         id: 'spawned-agent-123',
         name: 'Spawned Agent',
         config: { description: 'Spawned agent description' },
-      } as any);
-    });
+      });
+      
+      vi.spyOn(subAgentService, 'runSubAgent').mockImplementation(mockRunSubAgent);
 
-    it('should spawn agent and run workflow', async () => {
-      const result = await workflowCommand.execute('spawn testWorkflow', agent);
+      const result = await workflowSpawnCommand.execute({ 
+        positionals: { workflowName: 'testWorkflow' }, 
+        args: {}, 
+        agent 
+      });
 
       expect(result).toContain('Spawned agent for workflow: Test Workflow');
-      expect(runSubAgent).toHaveBeenCalledWith(
+      expect(subAgentService.runSubAgent).toHaveBeenCalledWith(
         expect.objectContaining({
           agentType: 'test-agent',
-        }),
-        agent,
-        true
+          input: {
+            from: 'Workflow testWorkflow',
+            message: '/workflow run testWorkflow'
+          },
+          headless: false,
+          parentAgent: agent
+        })
       );
     });
 
     it('should handle headless spawning', async () => {
       agent.config.headless = true;
-      const result = await workflowCommand.execute('spawn testWorkflow', agent);
+      
+      const mockRunSubAgent = vi.fn().mockResolvedValue({
+        id: 'spawned-agent-123',
+        name: 'Spawned Agent',
+        config: { description: 'Spawned agent description' },
+      });
+      
+      vi.spyOn(subAgentService, 'runSubAgent').mockImplementation(mockRunSubAgent);
 
-      expect(runSubAgent).toHaveBeenCalledWith(
+      const result = await workflowSpawnCommand.execute({ 
+        positionals: { workflowName: 'testWorkflow' }, 
+        args: {}, 
+        agent 
+      });
+
+      expect(subAgentService.runSubAgent).toHaveBeenCalledWith(
         expect.objectContaining({
           headless: true,
-        }),
-        agent,
-        true
+        })
       );
     });
 
     it('should show error for non-existent workflow', async () => {
-      const result = await workflowCommand.execute('spawn nonExistentWorkflow', agent);
-
-      expect(result).toContain('Workflow "nonExistentWorkflow" not found.');
-    });
-
-    it('should show usage when no workflow name provided', async () => {
-      const result = await workflowCommand.execute('spawn', agent);
-
-      expect(result).toContain('Usage: /workflow spawn <name>');
-    });
-  });
-
-  describe('execute() with unknown command', () => {
-    it('should show error for unknown command', async () => {
-      const result = await workflowCommand.execute('unknown command', agent);
-
-      expect(result).toContain('Unknown subcommand: unknown');
-      expect(result).toContain('Available subcommands: list, run, spawn');
+      await expect(workflowSpawnCommand.execute({ 
+        positionals: { workflowName: 'nonExistentWorkflow' }, 
+        args: {}, 
+        agent 
+      })).rejects.toThrow('Workflow "nonExistentWorkflow" not found.');
     });
   });
 
   describe('Integration scenarios', () => {
     it('should handle full workflow execution flow', async () => {
       vi.spyOn(agentCommandService, 'executeAgentCommand').mockImplementation(() => Promise.resolve());
-      const result = await workflowCommand.execute('run testWorkflow', agent);
+      const result = await workflowRunCommand.execute({ 
+        positionals: { workflowName: 'testWorkflow' }, 
+        args: {}, 
+        agent 
+      });
 
       expect(result).toContain('Workflow "testWorkflow" completed');
       expect(agentCommandService.executeAgentCommand).toHaveBeenCalledTimes(3);
     });
 
     it('should handle full workflow spawn flow', async () => {
-      const result = await workflowCommand.execute('spawn complexWorkflow', agent);
+      const mockRunSubAgent = vi.fn().mockResolvedValue({
+        id: 'spawned-agent-123',
+        name: 'Spawned Agent',
+        config: { description: 'Spawned agent description' },
+      });
+      
+      vi.spyOn(subAgentService, 'runSubAgent').mockImplementation(mockRunSubAgent);
+
+      const result = await workflowSpawnCommand.execute({ 
+        positionals: { workflowName: 'complexWorkflow' }, 
+        args: {}, 
+        agent 
+      });
 
       expect(result).toContain('Spawned agent for workflow: Complex Workflow');
-      expect(runSubAgent).toHaveBeenCalledWith(
+      expect(subAgentService.runSubAgent).toHaveBeenCalledWith(
         expect.objectContaining({
           agentType: 'complex-agent',
-        }),
-        agent,
-        true
+        })
       );
-    });
-  });
-
-  describe('Command parsing', () => {
-    it('should handle various input formats', async () => {
-      const result1 = await workflowCommand.execute('run   testWorkflow   ', agent);
-      expect(result1).toContain('Workflow "testWorkflow" completed');
-
-      const result2 = await workflowCommand.execute('list', agent);
-      expect(result2).toContain('Available workflows:');
-    });
-  });
-});
-
-describe('workflow command metadata', () => {
-  it('should implement TokenRingAgentCommand interface', () => {
-    const command = {
-      description: workflowCommand.description,
-      execute: workflowCommand.execute,
-      help: workflowCommand.help,
-    };
-
-    expect(command).toMatchObject({
-      description: expect.stringContaining('/workflow'),
-      execute: expect.any(Function),
-      help: expect.stringContaining('/workflow run'),
     });
   });
 });
