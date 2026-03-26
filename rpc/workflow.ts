@@ -1,6 +1,6 @@
 import TokenRingApp from "@tokenring-ai/app";
 import {createRPCEndpoint} from "@tokenring-ai/rpc/createRPCEndpoint";
-import WorkflowService from "../WorkflowService.js";
+import WorkflowService from "../WorkflowService.ts";
 import WorkflowRpcSchema from "./schema.ts";
 
 export default createRPCEndpoint(WorkflowRpcSchema, {

@@ -429,12 +429,12 @@ const agent = await rpcClient.spawnWorkflow({ workflowName: "morning-article", h
 The workflow package integrates with several TokenRing services:
 
 - **AgentCommandService**: Registers chat commands for workflow interaction
-- **Agent System**: Supports both current agent execution and agent spawning via `runSubAgent`
+- **Agent System**: Supports both current agent execution and agent spawning via `SubAgentService`
 - **Plugin System**: Auto-registers with the TokenRing application
 - **Configuration System**: Validates workflow configuration through Zod schemas
 - **RpcService**: Provides JSON-RPC endpoints for remote access
 - **AgentManager**: Handles agent spawning and lifecycle
-- **runSubAgent**: Utility for spawning agents with commands
+- **SubAgentService**: Manages sub-agent creation and command execution
 
 ## Execution Flow
 
@@ -442,7 +442,7 @@ The workflow package integrates with several TokenRing services:
 2. **Validation**: Workflow existence and configuration validation
 3. **Agent Resolution**:
    - `run`: Uses current agent
-   - `spawn`: Creates new agent with specified type via `runSubAgent`
+   - `spawn`: Creates new agent with specified type via `SubAgentService.runSubAgent()`
 4. **Step Execution**: Sequential execution of all workflow steps via `agentCommandService.executeAgentCommand()`
 5. **Command Processing**: Each step processed through the agent command service
 6. **Abort Check**: Each step checks for abort signal before execution
@@ -504,12 +504,12 @@ bun test --coverage
 
 ### Test Coverage
 
-- **Command Implementation**: Tests for list, run, and spawn commands
-- **Workflow Execution**: Tests for workflow step execution
-- **Agent Spawning**: Tests for runSubAgent integration
-- **Error Handling**: Tests for workflow not found scenarios
+- **Command Implementation**: Tests for `/workflow list`, `/workflow run`, and `/workflow spawn` commands
+- **Workflow Execution**: Tests for sequential workflow step execution
+- **Agent Spawning**: Tests for `SubAgentService.runSubAgent()` integration
+- **Error Handling**: Tests for workflow not found scenarios and command failures
 - **Input Parsing**: Tests for various input formats and edge cases
-- **Integration**: Full workflow execution flow tests
+- **Integration**: Full workflow execution and spawn flow tests
 
 ## Package Structure
 
@@ -532,7 +532,7 @@ pkg/workflow/
 │   ├── schema.ts            # JSON-RPC schema definition
 │   └── workflow.ts          # RPC endpoint implementation
 └── commands/
-    └── workflow.test.ts     # Unit tests for chat commands
+    └── workflow.test.ts       # Unit tests for chat commands
 ```
 
 ## Dependencies
@@ -543,13 +543,13 @@ pkg/workflow/
 - `@tokenring-ai/agent` (0.2.0) - Agent orchestration and management
 - `@tokenring-ai/chat` (0.2.0) - Chat service integration
 - `@tokenring-ai/rpc` (0.2.0) - JSON-RPC endpoint management
-- `@tokenring-ai/utility` (0.2.0) - Utility functions and helpers (for `indent` function)
+- `@tokenring-ai/utility` (0.2.0) - Utility functions and helpers
 - `zod` (^4.3.6) - Schema validation
 
 ### Development Dependencies
 
-- `vitest` (^4.1.0) - Testing framework
-- `typescript` (^5.9.3) - TypeScript compiler
+- `vitest` (^4.1.1) - Testing framework
+- `typescript` (^6.0.2) - TypeScript compiler
 
 ## License
 

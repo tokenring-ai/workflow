@@ -1,7 +1,7 @@
 import {AgentCommandService} from "@tokenring-ai/agent";
 import {CommandFailedError} from "@tokenring-ai/agent/AgentError";
 import type {AgentCommandInputSchema, AgentCommandInputType, TokenRingAgentCommand} from "@tokenring-ai/agent/types";
-import WorkflowService from "../../WorkflowService.js";
+import WorkflowService from "../../WorkflowService.ts";
 
 const inputSchema = {
   args: {},
