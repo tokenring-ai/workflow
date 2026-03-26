@@ -37,7 +37,7 @@ export default class WorkflowService implements TokenRingService {
 
     const workflow = this.getWorkflow(workflowName);
     if (!workflow) {
-      throw new Error(`Workflow "${workflowName}" not found`);
+      throw new Error(`Workflow "${workflowName}" not found.`);
     }
 
     const agent = await agentManager.spawnAgent({
