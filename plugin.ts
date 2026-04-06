@@ -14,9 +14,10 @@ const packageConfigSchema = z.object({
 
 export default {
   name: packageJSON.name,
+  displayName: "Workflow Orchestration",
   version: packageJSON.version,
   description: packageJSON.description,
-  install(app, config) {
+  async install(app, config) {
     app.waitForService(AgentCommandService, agentCommandService =>
       agentCommandService.addAgentCommands(agentCommands)
     );
@@ -26,6 +27,10 @@ export default {
     app.waitForService(RpcService, rpcService => {
       rpcService.registerEndpoint(workflowRPC);
     });
+  },
+
+  async reconfigure(app, config) {
+    await app.requireService(WorkflowService).reconfigure(config.workflows);
   },
   config: packageConfigSchema
 } satisfies TokenRingPlugin<typeof packageConfigSchema>;

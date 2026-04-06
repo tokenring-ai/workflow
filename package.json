@@ -1,6 +1,6 @@
 {
   "name": "@tokenring-ai/workflow",
-  "description": "Service for running multi-step agent workflows",
+  "description": "Service for defining and running linear, multi-step agent processes.",
   "version": "0.2.0",
   "dependencies": {
     "@tokenring-ai/app": "0.2.0",

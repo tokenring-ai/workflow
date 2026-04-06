@@ -6,5 +6,9 @@ export const WorkflowItemSchema = z.object({
   agentType: z.string(),
   steps: z.array(z.string()),
 });
-export const WorkflowConfigSchema = z.record(z.string(), WorkflowItemSchema);
+
+export const WorkflowConfigSchema = z.record(
+  z.string(), WorkflowItemSchema
+);
+
 export type ParsedWorkflowConfig = z.output<typeof WorkflowConfigSchema>;

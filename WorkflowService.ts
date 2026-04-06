@@ -9,24 +9,23 @@ export type WorkflowItem = z.infer<typeof WorkflowItemSchema>;
 export default class WorkflowService implements TokenRingService {
   readonly name = "WorkflowService";
   description = "Manages multi-step agent workflows";
-  workflows: Map<string, WorkflowItem>;
 
-  constructor(private app: TokenRingApp, workflows: ParsedWorkflowConfig) {
+  constructor(private app: TokenRingApp, private config: ParsedWorkflowConfig) {
     this.app = app;
-    this.workflows = new Map(
-      Object.entries(workflows).map(([key, workflow]) => [
-        key,
-        WorkflowItemSchema.parse(workflow)
-      ])
-    );
+  }
+
+  async reconfigure(newConfig: ParsedWorkflowConfig): Promise<void> {
+    this.config = newConfig;
   }
 
   getWorkflow(name: string): WorkflowItem | undefined {
-    return this.workflows.get(name);
+    if (Object.hasOwn(this.config, name)) {
+      return this.config[name];
+    }
   }
 
   listWorkflows(): Array<{ key: string; workflow: WorkflowItem }> {
-    return Array.from(this.workflows.entries()).map(([key, workflow]) => ({
+    return Object.entries(this.config).map(([key, workflow]) => ({
       key,
       workflow,
     }));
