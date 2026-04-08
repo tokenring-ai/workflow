@@ -17,10 +17,8 @@ async function execute({positionals: {workflowName}, agent}: AgentCommandInputTy
   const subAgentService = agent.requireServiceByType(SubAgentService);
   await subAgentService.runSubAgent({
     agentType: workflow.agentType,
-    input: {
-      from: `Workflow ${workflowName}`,
-      message: `/workflow run ${workflowName}`
-    },
+    from: `Workflow ${workflowName}`,
+    steps: [`/workflow run ${workflowName}`],
     headless: agent.headless,
     parentAgent: agent
   });
