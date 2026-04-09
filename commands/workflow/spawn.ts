@@ -20,7 +20,8 @@ async function execute({positionals: {workflowName}, agent}: AgentCommandInputTy
     from: `Workflow ${workflowName}`,
     steps: [`/workflow run ${workflowName}`],
     headless: agent.headless,
-    parentAgent: agent
+    parentAgent: agent,
+    options: workflow.subAgent,
   });
   return `Spawned agent for workflow: ${workflow.name}`;
 }
