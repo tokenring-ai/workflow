@@ -4,9 +4,9 @@ import TokenRingApp from '@tokenring-ai/app';
 import createTestingApp from '@tokenring-ai/app/test/createTestingApp';
 import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
 import WorkflowService from '../WorkflowService';
+import workflowListCommand from './workflow/list.ts';
 import workflowRunCommand from './workflow/run.ts';
 import workflowSpawnCommand from './workflow/spawn.ts';
-import workflowListCommand from './workflow/list.ts';
 
 describe('workflow command', () => {
   let app: TokenRingApp;
