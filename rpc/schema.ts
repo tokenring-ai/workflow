@@ -1,4 +1,4 @@
-import {RPCSchema} from "@tokenring-ai/rpc/types";
+import type {RPCSchema} from "@tokenring-ai/rpc/types";
 import {z} from "zod";
 
 export default {
@@ -8,13 +8,15 @@ export default {
     listWorkflows: {
       type: "query",
       input: z.object({}),
-      result: z.array(z.object({
-        key: z.string(),
-        name: z.string(),
-        description: z.string(),
-        agentType: z.string(),
-        steps: z.array(z.string()),
-      }))
+      result: z.array(
+        z.object({
+          key: z.string(),
+          name: z.string(),
+          description: z.string(),
+          agentType: z.string(),
+          steps: z.array(z.string()),
+        }),
+      ),
     },
     getWorkflow: {
       type: "query",
@@ -27,7 +29,7 @@ export default {
         description: z.string(),
         agentType: z.string(),
         steps: z.array(z.string()),
-      })
+      }),
     },
     spawnWorkflow: {
       type: "mutation",
@@ -39,7 +41,7 @@ export default {
         id: z.string(),
         name: z.string(),
         description: z.string(),
-      })
-    }
-  }
+      }),
+    },
+  },
 } satisfies RPCSchema;

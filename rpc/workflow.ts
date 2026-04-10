@@ -1,23 +1,23 @@
-import TokenRingApp from "@tokenring-ai/app";
+import type TokenRingApp from "@tokenring-ai/app";
 import {createRPCEndpoint} from "@tokenring-ai/rpc/createRPCEndpoint";
 import WorkflowService from "../WorkflowService.ts";
 import WorkflowRpcSchema from "./schema.ts";
 
 export default createRPCEndpoint(WorkflowRpcSchema, {
-  async listWorkflows(args, app: TokenRingApp) {
+  listWorkflows(_args, app: TokenRingApp) {
     const workflowService = app.requireService(WorkflowService);
     const workflows = workflowService.listWorkflows();
 
-    return workflows.map(({ key, workflow }) => ({
-        key,
-        name: workflow.name,
-        description: workflow.description,
-        agentType: workflow.agentType,
-        steps: workflow.steps,
-      }));
+    return workflows.map(({key, workflow}) => ({
+      key,
+      name: workflow.name,
+      description: workflow.description,
+      agentType: workflow.agentType,
+      steps: workflow.steps,
+    }));
   },
 
-  async getWorkflow(args, app: TokenRingApp) {
+  getWorkflow(args, app: TokenRingApp) {
     const workflowService = app.requireService(WorkflowService);
     const workflow = workflowService.getWorkflow(args.name);
 
@@ -37,7 +37,9 @@ export default createRPCEndpoint(WorkflowRpcSchema, {
   async spawnWorkflow(args, app: TokenRingApp) {
     const workflowService = app.requireService(WorkflowService);
 
-    const agent = await workflowService.spawnWorkflow(args.workflowName, { headless: args.headless });
+    const agent = await workflowService.spawnWorkflow(args.workflowName, {
+      headless: args.headless,
+    });
 
     return {
       id: agent.id,

@@ -9,8 +9,6 @@ export const WorkflowItemSchema = z.object({
   subAgent: SubAgentConfigSchema.prefault({}),
 });
 
-export const WorkflowConfigSchema = z.record(
-  z.string(), WorkflowItemSchema
-);
+export const WorkflowConfigSchema = z.record(z.string(), WorkflowItemSchema);
 
 export type ParsedWorkflowConfig = z.output<typeof WorkflowConfigSchema>;

@@ -1,8 +1,8 @@
-import {Agent, AgentManager} from "@tokenring-ai/agent";
-import TokenRingApp from "@tokenring-ai/app";
-import {TokenRingService} from "@tokenring-ai/app/types";
-import {z} from "zod";
-import {type ParsedWorkflowConfig, WorkflowItemSchema} from "./schema.ts";
+import {type Agent, AgentManager} from "@tokenring-ai/agent";
+import type TokenRingApp from "@tokenring-ai/app";
+import type {TokenRingService} from "@tokenring-ai/app/types";
+import type {z} from "zod";
+import type {ParsedWorkflowConfig, WorkflowItemSchema} from "./schema.ts";
 
 export type WorkflowItem = z.infer<typeof WorkflowItemSchema>;
 
@@ -10,11 +10,14 @@ export default class WorkflowService implements TokenRingService {
   readonly name = "WorkflowService";
   description = "Manages multi-step agent workflows";
 
-  constructor(private app: TokenRingApp, private config: ParsedWorkflowConfig) {
+  constructor(
+    private app: TokenRingApp,
+    private config: ParsedWorkflowConfig,
+  ) {
     this.app = app;
   }
 
-  async reconfigure(newConfig: ParsedWorkflowConfig): Promise<void> {
+  reconfigure(newConfig: ParsedWorkflowConfig): void {
     this.config = newConfig;
   }
 
@@ -31,7 +34,10 @@ export default class WorkflowService implements TokenRingService {
     }));
   }
 
-  async spawnWorkflow(workflowName: string, { headless }: { headless: boolean }): Promise<Agent> {
+  async spawnWorkflow(
+    workflowName: string,
+    {headless}: { headless: boolean },
+  ): Promise<Agent> {
     const agentManager = this.app.requireService(AgentManager);
 
     const workflow = this.getWorkflow(workflowName);
@@ -45,7 +51,7 @@ export default class WorkflowService implements TokenRingService {
     });
     agent.handleInput({
       from: `Workflow ${workflowName}`,
-      message: `/workflow run ${workflowName}`
+      message: `/workflow run ${workflowName}`,
     });
 
     return agent;

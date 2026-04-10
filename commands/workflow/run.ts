@@ -1,18 +1,24 @@
 import {AgentCommandService} from "@tokenring-ai/agent";
 import {CommandFailedError} from "@tokenring-ai/agent/AgentError";
-import type {AgentCommandInputSchema, AgentCommandInputType, TokenRingAgentCommand} from "@tokenring-ai/agent/types";
+import type {AgentCommandInputSchema, AgentCommandInputType, TokenRingAgentCommand,} from "@tokenring-ai/agent/types";
 import WorkflowService from "../../WorkflowService.ts";
 
 const inputSchema = {
   args: {},
-  positionals: [{name: "workflowName", description: "Workflow name", required: true}]
+  positionals: [
+    {name: "workflowName", description: "Workflow name", required: true},
+  ],
 } as const satisfies AgentCommandInputSchema;
 
-async function execute({positionals: {workflowName}, agent}: AgentCommandInputType<typeof inputSchema>): Promise<string> {
+async function execute({
+                         positionals: {workflowName},
+                         agent,
+                       }: AgentCommandInputType<typeof inputSchema>): Promise<string> {
   const workflowService = agent.requireServiceByType(WorkflowService);
 
   const workflow = workflowService.getWorkflow(workflowName);
-  if (!workflow) throw new CommandFailedError(`Workflow "${workflowName}" not found.`);
+  if (!workflow)
+    throw new CommandFailedError(`Workflow "${workflowName}" not found.`);
   const agentCommandService = agent.requireServiceByType(AgentCommandService);
   const signal = agent.getAbortSignal();
   for (const message of workflow.steps) {

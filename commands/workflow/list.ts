@@ -1,4 +1,4 @@
-import type {AgentCommandInputSchema, AgentCommandInputType, TokenRingAgentCommand} from "@tokenring-ai/agent/types";
+import type {AgentCommandInputSchema, AgentCommandInputType, TokenRingAgentCommand,} from "@tokenring-ai/agent/types";
 import indent from "@tokenring-ai/utility/string/indent";
 import WorkflowService from "../../WorkflowService.ts";
 
@@ -13,14 +13,18 @@ export default {
 
 /workflow list`,
   inputSchema,
-  execute: async ({agent}: AgentCommandInputType<typeof inputSchema>): Promise<string> => {
+  execute: ({
+              agent,
+            }: AgentCommandInputType<typeof inputSchema>): string => {
     const workflowService = agent.requireServiceByType(WorkflowService);
 
     const workflows = workflowService.listWorkflows();
     const lines = ["Available workflows:"];
     for (const {key, workflow} of workflows) {
       lines.push(`**${key}**: ${workflow.name}`);
-      lines.push(indent([workflow.description, `Steps: ${workflow.steps.length}`], 1));
+      lines.push(
+        indent([workflow.description, `Steps: ${workflow.steps.length}`], 1),
+      );
     }
     return lines.join("\n");
   },

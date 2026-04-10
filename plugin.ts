@@ -1,5 +1,5 @@
 import {AgentCommandService} from "@tokenring-ai/agent";
-import {TokenRingPlugin} from "@tokenring-ai/app";
+import type {TokenRingPlugin} from "@tokenring-ai/app";
 import {RpcService} from "@tokenring-ai/rpc";
 import {z} from "zod";
 import agentCommands from "./commands.ts";
@@ -9,7 +9,7 @@ import {WorkflowConfigSchema} from "./schema.ts";
 import WorkflowService from "./WorkflowService";
 
 const packageConfigSchema = z.object({
-  workflows: WorkflowConfigSchema.prefault({})
+  workflows: WorkflowConfigSchema.prefault({}),
 });
 
 export default {
@@ -17,14 +17,14 @@ export default {
   displayName: "Workflow Orchestration",
   version: packageJSON.version,
   description: packageJSON.description,
-  async install(app, config) {
-    app.waitForService(AgentCommandService, agentCommandService =>
-      agentCommandService.addAgentCommands(agentCommands)
+  install(app, config) {
+    app.waitForService(AgentCommandService, (agentCommandService) =>
+      agentCommandService.addAgentCommands(agentCommands),
     );
     const workflowService = new WorkflowService(app, config.workflows);
     app.addServices(workflowService);
 
-    app.waitForService(RpcService, rpcService => {
+    app.waitForService(RpcService, (rpcService) => {
       rpcService.registerEndpoint(workflowRPC);
     });
   },
@@ -32,5 +32,5 @@ export default {
   async reconfigure(app, config) {
     await app.requireService(WorkflowService).reconfigure(config.workflows);
   },
-  config: packageConfigSchema
+  config: packageConfigSchema,
 } satisfies TokenRingPlugin<typeof packageConfigSchema>;
