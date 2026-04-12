@@ -342,9 +342,11 @@ export type WorkflowItem = z.infer<typeof WorkflowItemSchema>;
 Retrieves a workflow by name.
 
 **Parameters:**
+
 - `name`: The workflow identifier
 
 **Returns:**
+
 - WorkflowItem or undefined if not found
 
 #### `listWorkflows(): Array<{ key: string; workflow: WorkflowItem }>`
@@ -352,6 +354,7 @@ Retrieves a workflow by name.
 Lists all available workflows.
 
 **Returns:**
+
 - Array of workflow entries with key and workflow object
 
 #### `spawnWorkflow(workflowName: string, { headless }: { headless: boolean }): Promise<Agent>`
@@ -359,10 +362,12 @@ Lists all available workflows.
 Spawns a new agent and runs the specified workflow.
 
 **Parameters:**
+
 - `workflowName`: The name of the workflow to run
 - `headless`: Whether to run in headless mode (default: false)
 
 **Returns:**
+
 - Promise resolving to the spawned Agent instance
 
 ## RPC Endpoints
@@ -380,6 +385,7 @@ The workflow package provides JSON-RPC endpoints under `/rpc/workflow`:
 ### Response Types
 
 **listWorkflows Response:**
+
 ```typescript
 {
   key: string;           // Workflow identifier
@@ -391,6 +397,7 @@ The workflow package provides JSON-RPC endpoints under `/rpc/workflow`:
 ```
 
 **getWorkflow Response:**
+
 ```typescript
 {
   key: string;           // Workflow identifier
@@ -402,6 +409,7 @@ The workflow package provides JSON-RPC endpoints under `/rpc/workflow`:
 ```
 
 **spawnWorkflow Response:**
+
 ```typescript
 {
   id: string;            // Spawned agent ID
@@ -466,6 +474,7 @@ The workflow package provides the following service:
 The main service class that manages workflow execution and agent spawning.
 
 **Service Interface:**
+
 ```typescript
 export default class WorkflowService implements TokenRingService {
   readonly name = "WorkflowService";
