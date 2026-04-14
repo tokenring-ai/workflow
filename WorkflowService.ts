@@ -13,9 +13,7 @@ export default class WorkflowService implements TokenRingService {
   constructor(
     private app: TokenRingApp,
     private config: ParsedWorkflowConfig,
-  ) {
-    this.app = app;
-  }
+  ) {}
 
   reconfigure(newConfig: ParsedWorkflowConfig): void {
     this.config = newConfig;
@@ -34,10 +32,10 @@ export default class WorkflowService implements TokenRingService {
     }));
   }
 
-  async spawnWorkflow(
+  spawnWorkflow(
     workflowName: string,
     {headless}: { headless: boolean },
-  ): Promise<Agent> {
+  ): Agent {
     const agentManager = this.app.requireService(AgentManager);
 
     const workflow = this.getWorkflow(workflowName);
@@ -45,7 +43,7 @@ export default class WorkflowService implements TokenRingService {
       throw new Error(`Workflow "${workflowName}" not found.`);
     }
 
-    const agent = await agentManager.spawnAgent({
+    const agent = agentManager.spawnAgent({
       agentType: workflow.agentType,
       headless,
     });

@@ -37,7 +37,7 @@ export default createRPCEndpoint(WorkflowRpcSchema, {
   async spawnWorkflow(args, app: TokenRingApp) {
     const workflowService = app.requireService(WorkflowService);
 
-    const agent = await workflowService.spawnWorkflow(args.workflowName, {
+    const agent = workflowService.spawnWorkflow(args.workflowName, {
       headless: args.headless,
     });
 

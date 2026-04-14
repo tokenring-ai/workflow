@@ -29,8 +29,8 @@ export default {
     });
   },
 
-  async reconfigure(app, config) {
-    await app.requireService(WorkflowService).reconfigure(config.workflows);
+  reconfigure(app, config) {
+    app.requireService(WorkflowService).reconfigure(config.workflows);
   },
   config: packageConfigSchema,
 } satisfies TokenRingPlugin<typeof packageConfigSchema>;
