@@ -1,6 +1,7 @@
 import {type Agent, AgentManager} from "@tokenring-ai/agent";
 import type TokenRingApp from "@tokenring-ai/app";
 import type {TokenRingService} from "@tokenring-ai/app/types";
+import KeyedRegistry from "@tokenring-ai/utility/registry/KeyedRegistry";
 import type {z} from "zod";
 import type {ParsedWorkflowConfig, WorkflowItemSchema} from "./schema.ts";
 
@@ -10,26 +11,19 @@ export default class WorkflowService implements TokenRingService {
   readonly name = "WorkflowService";
   description = "Manages multi-step agent workflows";
 
+  readonly workflows = new KeyedRegistry<WorkflowItem>();
+  getWorkflow = this.workflows.get;
+  listWorkflowEntries = this.workflows.entriesArray;
+
   constructor(
     private app: TokenRingApp,
     private config: ParsedWorkflowConfig,
-  ) {}
+  ) {
+    this.workflows.setAll(config);
+  }
 
   reconfigure(newConfig: ParsedWorkflowConfig): void {
     this.config = newConfig;
-  }
-
-  getWorkflow(name: string): WorkflowItem | undefined {
-    if (Object.hasOwn(this.config, name)) {
-      return this.config[name];
-    }
-  }
-
-  listWorkflows(): Array<{ key: string; workflow: WorkflowItem }> {
-    return Object.entries(this.config).map(([key, workflow]) => ({
-      key,
-      workflow,
-    }));
   }
 
   spawnWorkflow(

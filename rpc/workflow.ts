@@ -6,11 +6,11 @@ import WorkflowRpcSchema from "./schema.ts";
 export default createRPCEndpoint(WorkflowRpcSchema, {
   listWorkflows(_args, app: TokenRingApp) {
     const workflowService = app.requireService(WorkflowService);
-    const workflows = workflowService.listWorkflows();
+    const workflows = workflowService.listWorkflowEntries()
 
-    return workflows.map(({key, workflow}) => ({
-      key,
-      name: workflow.name,
+    return workflows.map(([name, workflow]) => ({
+      name,
+      displayName: workflow.displayName,
       description: workflow.description,
       agentType: workflow.agentType,
       steps: workflow.steps,
@@ -27,23 +27,23 @@ export default createRPCEndpoint(WorkflowRpcSchema, {
 
     return {
       key: args.name,
-      name: workflow.name,
+      displayName: workflow.displayName,
       description: workflow.description,
       agentType: workflow.agentType,
       steps: workflow.steps,
     };
   },
 
-  async spawnWorkflow(args, app: TokenRingApp) {
+  spawnWorkflow(args, app: TokenRingApp) {
     const workflowService = app.requireService(WorkflowService);
 
-    const agent = workflowService.spawnWorkflow(args.workflowName, {
+    const agent = workflowService.spawnWorkflow(args.name, {
       headless: args.headless,
     });
 
     return {
       id: agent.id,
-      name: agent.displayName,
+      displayName: agent.displayName,
       description: agent.config.description,
     };
   },

@@ -10,8 +10,8 @@ export default {
       input: z.object({}),
       result: z.array(
         z.object({
-          key: z.string(),
           name: z.string(),
+          displayName: z.string(),
           description: z.string(),
           agentType: z.string(),
           steps: z.array(z.string()),
@@ -24,8 +24,7 @@ export default {
         name: z.string(),
       }),
       result: z.object({
-        key: z.string(),
-        name: z.string(),
+        displayName: z.string(),
         description: z.string(),
         agentType: z.string(),
         steps: z.array(z.string()),
@@ -34,12 +33,12 @@ export default {
     spawnWorkflow: {
       type: "mutation",
       input: z.object({
-        workflowName: z.string(),
+        name: z.string(),
         headless: z.boolean().default(false),
       }),
       result: z.object({
         id: z.string(),
-        name: z.string(),
+        displayName: z.string(),
         description: z.string(),
       }),
     },

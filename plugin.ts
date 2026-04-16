@@ -1,4 +1,4 @@
-import {AgentCommandService} from "@tokenring-ai/agent";
+import {AgentCommandService, AgentManager} from "@tokenring-ai/agent";
 import type {TokenRingPlugin} from "@tokenring-ai/app";
 import {RpcService} from "@tokenring-ai/rpc";
 import {z} from "zod";
@@ -23,6 +23,15 @@ export default {
     );
     const workflowService = new WorkflowService(app, config.workflows);
     app.addServices(workflowService);
+
+    app.waitForService(AgentManager, agentManager => {
+      for (const [workflowName, workflowConfig] of Object.entries(config.workflows)) {
+        const agentType = workflowConfig.agentType;
+        if (!agentManager.getAgentConfig(agentType)) {
+          throw new Error(`Error while processing workflow ${workflowName}: Agent ${agentType} not found`);
+        }
+      }
+    });
 
     app.waitForService(RpcService, (rpcService) => {
       rpcService.registerEndpoint(workflowRPC);

@@ -29,7 +29,7 @@ async function execute({
     parentAgent: agent,
     options: workflow.subAgent,
   });
-  return `Spawned agent for workflow: ${workflow.name}`;
+  return `Spawned agent for workflow: ${workflow.displayName}`;
 }
 
 export default {

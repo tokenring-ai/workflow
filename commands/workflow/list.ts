@@ -18,10 +18,10 @@ export default {
             }: AgentCommandInputType<typeof inputSchema>): string => {
     const workflowService = agent.requireServiceByType(WorkflowService);
 
-    const workflows = workflowService.listWorkflows();
+    const workflows = workflowService.listWorkflowEntries();
     const lines = ["Available workflows:"];
-    for (const {key, workflow} of workflows) {
-      lines.push(`**${key}**: ${workflow.name}`);
+    for (const [name, workflow] of workflows) {
+      lines.push(`**${name}**: ${workflow.displayName}`);
       lines.push(
         indent([workflow.description, `Steps: ${workflow.steps.length}`], 1),
       );
