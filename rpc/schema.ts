@@ -1,5 +1,5 @@
-import type {RPCSchema} from "@tokenring-ai/rpc/types";
-import {z} from "zod";
+import type { RPCSchema } from "@tokenring-ai/rpc/types";
+import { z } from "zod";
 
 export default {
   name: "Workflow RPC",

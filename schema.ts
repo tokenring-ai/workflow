@@ -1,4 +1,4 @@
-import {SubAgentConfigSchema} from "@tokenring-ai/agent/schema";
+import { SubAgentConfigSchema } from "@tokenring-ai/agent/schema";
 import z from "zod";
 
 export const WorkflowItemSchema = z.object({

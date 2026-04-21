@@ -1,12 +1,12 @@
 import type TokenRingApp from "@tokenring-ai/app";
-import {createRPCEndpoint} from "@tokenring-ai/rpc/createRPCEndpoint";
+import { createRPCEndpoint } from "@tokenring-ai/rpc/createRPCEndpoint";
 import WorkflowService from "../WorkflowService.ts";
 import WorkflowRpcSchema from "./schema.ts";
 
 export default createRPCEndpoint(WorkflowRpcSchema, {
   listWorkflows(_args, app: TokenRingApp) {
     const workflowService = app.requireService(WorkflowService);
-    const workflows = workflowService.listWorkflowEntries()
+    const workflows = workflowService.listWorkflowEntries();
 
     return workflows.map(([name, workflow]) => ({
       name,

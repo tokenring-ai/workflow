@@ -1,9 +1,9 @@
-import {type Agent, AgentManager} from "@tokenring-ai/agent";
+import { type Agent, AgentManager } from "@tokenring-ai/agent";
 import type TokenRingApp from "@tokenring-ai/app";
-import type {TokenRingService} from "@tokenring-ai/app/types";
+import type { TokenRingService } from "@tokenring-ai/app/types";
 import KeyedRegistry from "@tokenring-ai/utility/registry/KeyedRegistry";
-import type {z} from "zod";
-import type {ParsedWorkflowConfig, WorkflowItemSchema} from "./schema.ts";
+import type { z } from "zod";
+import type { ParsedWorkflowConfig, WorkflowItemSchema } from "./schema.ts";
 
 export type WorkflowItem = z.infer<typeof WorkflowItemSchema>;
 
@@ -26,10 +26,7 @@ export default class WorkflowService implements TokenRingService {
     this.config = newConfig;
   }
 
-  spawnWorkflow(
-    workflowName: string,
-    {headless}: { headless: boolean },
-  ): Agent {
+  spawnWorkflow(workflowName: string, { headless }: { headless: boolean }): Agent {
     const agentManager = this.app.requireService(AgentManager);
 
     const workflow = this.getWorkflow(workflowName);
