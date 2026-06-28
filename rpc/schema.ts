@@ -11,6 +11,7 @@ export default {
       result: z.array(
         z.object({
           name: z.string(),
+          category: z.string(),
           displayName: z.string(),
           description: z.string(),
           agentType: z.string(),
@@ -25,6 +26,7 @@ export default {
       }),
       result: z.object({
         displayName: z.string(),
+        category: z.string(),
         description: z.string(),
         agentType: z.string(),
         steps: z.array(z.string()),

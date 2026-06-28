@@ -11,6 +11,7 @@ export default createRPCEndpoint(WorkflowRpcSchema, {
     return workflows.map(([name, workflow]) => ({
       name,
       displayName: workflow.displayName,
+      category: workflow.category,
       description: workflow.description,
       agentType: workflow.agentType,
       steps: workflow.steps,
@@ -26,7 +27,7 @@ export default createRPCEndpoint(WorkflowRpcSchema, {
     }
 
     return {
-      key: args.name,
+      category: workflow.category,
       displayName: workflow.displayName,
       description: workflow.description,
       agentType: workflow.agentType,

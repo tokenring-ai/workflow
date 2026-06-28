@@ -3,6 +3,7 @@ import z from "zod";
 
 export const WorkflowItemSchema = z.object({
   displayName: z.string(),
+  category: z.string().default("User-Created Workflows"),
   description: z.string(),
   agentType: z.string(),
   steps: z.array(z.string()),
