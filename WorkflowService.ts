@@ -1,6 +1,7 @@
 import { type Agent, AgentManager } from "@tokenring-ai/agent";
 import type TokenRingApp from "@tokenring-ai/app";
 import type { TokenRingService } from "@tokenring-ai/app/types";
+import { ConfigurationError } from "@tokenring-ai/app/types";
 import KeyedRegistry from "@tokenring-ai/utility/registry/KeyedRegistry";
 import type { z } from "zod";
 import type { ParsedWorkflowConfig, WorkflowItemSchema } from "./schema.ts";
@@ -31,7 +32,7 @@ export default class WorkflowService implements TokenRingService {
 
     const workflow = this.getWorkflow(workflowName);
     if (!workflow) {
-      throw new Error(`Workflow "${workflowName}" not found.`);
+      throw new ConfigurationError(this.name, `Workflow "${workflowName}" not found.`);
     }
 
     const agent = agentManager.spawnAgent({
