@@ -1,4 +1,5 @@
 import { Agent, AgentCommandService, SubAgentService } from "@tokenring-ai/agent";
+import type { TokenRingAgentCommandResult } from "@tokenring-ai/agent/types";
 import createTestingAgent from "@tokenring-ai/agent/test/createTestingAgent.test";
 import TokenRingApp from "@tokenring-ai/app";
 import createTestingApp from "@tokenring-ai/app/test/createTestingApp.test";
@@ -17,16 +18,40 @@ describe("workflow command", () => {
 
   const mockWorkflows = {
     testWorkflow: {
-      name: "Test Workflow",
+      displayName: "Test Workflow",
+      category: "User-Created Workflows",
       description: "A test workflow",
       agentType: "test-agent",
       steps: ["step1", "step2", "step3"],
+      subAgent: {
+        forwardChatOutput: false,
+        forwardStatusMessages: true,
+        forwardSystemOutput: false,
+        forwardHumanRequests: true,
+        forwardReasoning: false,
+        forwardInputCommands: true,
+        timeout: 0,
+        maxResponseLength: 10000,
+        minContextLength: 1000,
+      },
     },
     complexWorkflow: {
-      name: "Complex Workflow",
+      displayName: "Complex Workflow",
+      category: "User-Created Workflows",
       description: "A complex test workflow",
       agentType: "complex-agent",
       steps: ["setup", "process", "validate", "cleanup"],
+      subAgent: {
+        forwardChatOutput: false,
+        forwardStatusMessages: true,
+        forwardSystemOutput: false,
+        forwardHumanRequests: true,
+        forwardReasoning: false,
+        forwardInputCommands: true,
+        timeout: 0,
+        maxResponseLength: 10000,
+        minContextLength: 1000,
+      },
     },
   };
 
@@ -73,7 +98,7 @@ describe("workflow command", () => {
 
   describe("run command", () => {
     it("should execute workflow steps", async () => {
-      vi.spyOn(agentCommandService, "executeAgentCommand").mockImplementation(() => Promise.resolve());
+      vi.spyOn(agentCommandService, "executeAgentCommand").mockImplementation(() => Promise.resolve<TokenRingAgentCommandResult>({ message: "mock" }));
 
       const result = await workflowRunCommand.execute({
         positionals: { workflowName: "testWorkflow" },
@@ -88,7 +113,7 @@ describe("workflow command", () => {
     });
 
     it("should handle complex workflow steps", async () => {
-      vi.spyOn(agentCommandService, "executeAgentCommand").mockImplementation(() => Promise.resolve());
+      vi.spyOn(agentCommandService, "executeAgentCommand").mockImplementation(() => Promise.resolve<TokenRingAgentCommandResult>({ message: "mock" }));
       const result = await workflowRunCommand.execute({
         positionals: { workflowName: "complexWorkflow" },
         args: {},
@@ -176,7 +201,7 @@ describe("workflow command", () => {
 
   describe("Integration scenarios", () => {
     it("should handle full workflow execution flow", async () => {
-      vi.spyOn(agentCommandService, "executeAgentCommand").mockImplementation(() => Promise.resolve());
+      vi.spyOn(agentCommandService, "executeAgentCommand").mockImplementation(() => Promise.resolve<TokenRingAgentCommandResult>({ message: "mock" }));
       const result = await workflowRunCommand.execute({
         positionals: { workflowName: "testWorkflow" },
         args: {},
