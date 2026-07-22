@@ -653,7 +653,6 @@ pkg/workflow/
 ├── README.md                # This file
 ├── schema.ts                # Zod schema definitions
 ├── WorkflowService.ts       # Core service implementation
-├── vitest.config.ts         # Vitest configuration
 ├── commands.ts              # Command registry (exports list, run, spawn commands)
 ├── commands/
 │   ├── workflow/
@@ -678,7 +677,7 @@ pkg/workflow/
 
 ### Development Dependencies
 
-- `vitest` (^4.1.1) - Testing framework
+- `bun test` - Testing framework
 - `typescript` (^6.0.2) - TypeScript compiler
 
 ## License
