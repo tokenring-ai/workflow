@@ -39,5 +39,5 @@ export default {
   reconfigure(app, config) {
     app.requireService(WorkflowService).reconfigure(config.workflows);
   },
-  config: packageConfigSchema,
+  configSchema: packageConfigSchema,
 } satisfies TokenRingPlugin<typeof packageConfigSchema>;
