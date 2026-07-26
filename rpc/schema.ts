@@ -1,5 +1,7 @@
 import type { RPCSchema } from "@tokenring-ai/rpc/types";
+import { SuccessSchema } from "@tokenring-ai/rpc/types";
 import { z } from "zod";
+import { WorkflowItemSchema, WorkflowRunSchema, WorkflowSchema } from "../schema.ts";
 
 export default {
   name: "Workflow RPC",
@@ -8,16 +10,14 @@ export default {
     listWorkflows: {
       type: "query",
       input: z.object({}),
-      result: z.array(
-        z.object({
-          name: z.string(),
-          category: z.string(),
-          displayName: z.string(),
-          description: z.string(),
-          agentType: z.string(),
-          steps: z.array(z.string()),
-        }),
-      ),
+      result: z.array(WorkflowSchema),
+    },
+    getWorkflowDirectory: {
+      type: "query",
+      input: z.object({}),
+      result: z.object({
+        directory: z.string(),
+      }),
     },
     getWorkflow: {
       type: "query",
@@ -25,11 +25,43 @@ export default {
         name: z.string(),
       }),
       result: z.object({
-        displayName: z.string(),
-        category: z.string(),
-        description: z.string(),
-        agentType: z.string(),
-        steps: z.array(z.string()),
+        workflow: WorkflowSchema.nullable(),
+      }),
+    },
+    createWorkflow: {
+      type: "mutation",
+      input: z.object({
+        name: z.string(),
+        workflow: WorkflowItemSchema,
+      }),
+      result: z.object({
+        workflow: WorkflowSchema,
+      }),
+    },
+    updateWorkflow: {
+      type: "mutation",
+      input: z.object({
+        name: z.string(),
+        workflow: WorkflowItemSchema,
+      }),
+      result: z.object({
+        workflow: WorkflowSchema,
+      }),
+    },
+    deleteWorkflow: {
+      type: "mutation",
+      input: z.object({
+        name: z.string(),
+      }),
+      result: z.object({
+        success: z.boolean(),
+      }),
+    },
+    streamWorkflowRuns: {
+      type: "stream",
+      input: z.object({}),
+      result: SuccessSchema.extend({
+        runs: z.array(WorkflowRunSchema),
       }),
     },
     spawnWorkflow: {

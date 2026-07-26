@@ -1,44 +1,46 @@
 import type TokenRingApp from "@tokenring-ai/app";
 import { createRPCEndpoint } from "@tokenring-ai/rpc/createRPCEndpoint";
+import { WorkflowState } from "../state/workflowState.ts";
 import WorkflowService from "../WorkflowService.ts";
 import WorkflowRpcSchema from "./schema.ts";
 
 export default createRPCEndpoint(WorkflowRpcSchema, {
-  listWorkflows(_args, app: TokenRingApp) {
-    const workflowService = app.requireService(WorkflowService);
-    const workflows = workflowService.listWorkflowEntries();
-
-    return workflows.map(([name, workflow]) => ({
-      name,
-      displayName: workflow.displayName,
-      category: workflow.category,
-      description: workflow.description,
-      agentType: workflow.agentType,
-      steps: workflow.steps,
-    }));
+  async listWorkflows(_args, app: TokenRingApp) {
+    return app.requireService(WorkflowService).listWorkflows();
   },
 
-  getWorkflow(args, app: TokenRingApp) {
-    const workflowService = app.requireService(WorkflowService);
-    const workflow = workflowService.getWorkflow(args.name);
+  getWorkflowDirectory(_args, app: TokenRingApp) {
+    return { directory: app.requireService(WorkflowService).getWorkflowDirectory() };
+  },
 
-    if (!workflow) {
-      throw new Error(`Workflow "${args.name}" not found`);
+  async getWorkflow(args, app: TokenRingApp) {
+    const workflow = await app.requireService(WorkflowService).getWorkflow(args.name);
+    return { workflow };
+  },
+
+  async createWorkflow(args, app: TokenRingApp) {
+    const workflow = await app.requireService(WorkflowService).createWorkflow(args.name, args.workflow);
+    return { workflow };
+  },
+
+  async updateWorkflow(args, app: TokenRingApp) {
+    const workflow = await app.requireService(WorkflowService).updateWorkflow(args.name, args.workflow);
+    return { workflow };
+  },
+
+  async deleteWorkflow(args, app: TokenRingApp) {
+    const success = await app.requireService(WorkflowService).deleteWorkflow(args.name);
+    return { success };
+  },
+
+  async *streamWorkflowRuns(_args, app: TokenRingApp, signal) {
+    for await (const state of app.stateManager.subscribeAsync(WorkflowState, signal)) {
+      yield { status: "success" as const, runs: state.runs.map(run => ({ ...run })) };
     }
-
-    return {
-      category: workflow.category,
-      displayName: workflow.displayName,
-      description: workflow.description,
-      agentType: workflow.agentType,
-      steps: workflow.steps,
-    };
   },
 
-  spawnWorkflow(args, app: TokenRingApp) {
-    const workflowService = app.requireService(WorkflowService);
-
-    const agent = workflowService.spawnWorkflow(args.name, {
+  async spawnWorkflow(args, app: TokenRingApp) {
+    const agent = await app.requireService(WorkflowService).spawnWorkflow(args.name, {
       headless: args.headless,
     });
 

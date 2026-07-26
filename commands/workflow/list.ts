@@ -13,13 +13,16 @@ export default {
 
 /workflow list`,
   inputSchema,
-  execute: ({ agent }: AgentCommandInputType<typeof inputSchema>): string => {
+  execute: async ({ agent }: AgentCommandInputType<typeof inputSchema>): Promise<string> => {
     const workflowService = agent.requireServiceByType(WorkflowService);
 
-    const workflows = workflowService.listWorkflowEntries();
+    const workflows = await workflowService.listWorkflows();
+    if (workflows.length === 0) {
+      return `No workflows found in ${workflowService.getWorkflowDirectory()}`;
+    }
     const lines = ["Available workflows:"];
-    for (const [name, workflow] of workflows) {
-      lines.push(`**${name}**: ${workflow.displayName}`);
+    for (const workflow of workflows) {
+      lines.push(`**${workflow.name}**: ${workflow.displayName}`);
       lines.push(indent([workflow.description, `Steps: ${workflow.steps.length}`], 1));
     }
     return lines.join("\n");
