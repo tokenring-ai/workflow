@@ -29,7 +29,9 @@ describe("WorkflowService", () => {
   });
 
   function makeService(workflowDirectory: string): WorkflowService {
-    return new WorkflowService(app, { workflowDirectory });
+    const service = new WorkflowService(app);
+    service.reconfigure({ workflowDirectory });
+    return service;
   }
 
   const sampleWorkflow = {
@@ -163,7 +165,8 @@ describe("WorkflowService run tracking", () => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), "tr-workflow-"));
     tempDirs.push(dir);
 
-    const service = new WorkflowService(app, { workflowDirectory: dir });
+    const service = new WorkflowService(app);
+    service.reconfigure({ workflowDirectory: dir });
     app.addServices(service);
     return { app, service };
   }

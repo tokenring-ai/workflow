@@ -57,8 +57,12 @@ export type WorkflowRun = z.output<typeof WorkflowRunSchema>;
 
 export const WorkflowServiceConfigSchema = z
   .object({
-    workflowDirectory: z.string().meta({ description: "Directory where workflow YAML files are stored" } satisfies ConfigFieldMeta),
+    workflowDirectory: z
+      .string()
+      .default("workflows")
+      .meta({ description: "Directory where workflow YAML files are stored" } satisfies ConfigFieldMeta),
   })
+  .prefault({})
   .meta({ label: "Workflows", description: "Reusable multi-step workflows, backed by YAML files on disk" } satisfies ConfigFieldMeta);
 
 export type WorkflowServiceConfig = z.input<typeof WorkflowServiceConfigSchema>;

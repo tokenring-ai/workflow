@@ -9,7 +9,14 @@ import type { TokenRingService } from "@tokenring-ai/app/types";
 import { ConfigurationError } from "@tokenring-ai/app/types";
 import formatError from "@tokenring-ai/utility/error/formatError";
 import { YAML } from "bun";
-import { type ParsedWorkflowConfig, type Workflow, type WorkflowItemInput, WorkflowItemSchema, type WorkflowRun } from "./schema.ts";
+import {
+  type ParsedWorkflowConfig,
+  type Workflow,
+  type WorkflowItemInput,
+  WorkflowItemSchema,
+  type WorkflowRun,
+  WorkflowServiceConfigSchema,
+} from "./schema.ts";
 import { WorkflowState } from "./state/workflowState.ts";
 
 const NAME_PATTERN = /^[a-zA-Z0-9][a-zA-Z0-9_-]*$/;
@@ -47,10 +54,9 @@ export default class WorkflowService implements TokenRingService {
   readonly name = "WorkflowService";
   description = "Manages multi-step agent workflows, backed by YAML files on disk";
 
-  constructor(
-    private app: TokenRingApp,
-    private config: ParsedWorkflowConfig,
-  ) {
+  private config = WorkflowServiceConfigSchema.parse({});
+
+  constructor(private app: TokenRingApp) {
     this.app.stateManager.initializeState(WorkflowState, MAX_FINISHED_RUNS);
   }
 
@@ -59,7 +65,7 @@ export default class WorkflowService implements TokenRingService {
   }
 
   getWorkflowDirectory(): string {
-    return this.config.workflowDirectory;
+    return path.resolve(this.app.appConfig.dataDirectory, this.config.workflowDirectory);
   }
 
   /**

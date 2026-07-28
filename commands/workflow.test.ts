@@ -44,7 +44,8 @@ describe("workflow command", () => {
       fs.writeFileSync(path.join(workflowDirectory, `${name}.yaml`), YAML.stringify(workflow, null, 2));
     }
 
-    workflowService = new WorkflowService(app, { workflowDirectory });
+    workflowService = new WorkflowService(app);
+    workflowService.reconfigure({ workflowDirectory });
     app.addServices(workflowService);
 
     agent = createTestingAgent(app);

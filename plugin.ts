@@ -17,9 +17,9 @@ export default {
   displayName: "Workflow Orchestration",
   version: packageJSON.version,
   description: packageJSON.description,
-  install(app, config) {
+  install(app) {
     app.waitForService(AgentCommandService, agentCommandService => agentCommandService.addAgentCommands(agentCommands));
-    const workflowService = new WorkflowService(app, config.workflows);
+    const workflowService = new WorkflowService(app);
     app.addServices(workflowService);
 
     app.waitForService(RpcService, rpcService => {
