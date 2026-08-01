@@ -39,7 +39,14 @@ describe("WorkflowService", () => {
     category: "Code Review",
     description: "Finds and fixes bugs",
     agentType: "leader",
-    steps: ["/list @packages = getPackages()", "/for $pkg in @packages {\n  /eval /agent run fix bugs in $pkg\n}"],
+    steps: [
+      "Find every package in the monorepo",
+      {
+        command: "agent run",
+        arguments: { type: "code-quality-engineer" },
+        remainder: "Fix bugs in the packages",
+      },
+    ],
   };
 
   test("listWorkflows returns an empty array when the directory doesn't exist", async () => {
@@ -98,8 +105,8 @@ describe("WorkflowService", () => {
     const service = makeService(dir);
     await service.createWorkflow("bugHunter", sampleWorkflow);
 
-    const updated = await service.updateWorkflow("bugHunter", { ...sampleWorkflow, displayName: "Renamed", steps: ["/one"] });
-    expect(updated).toMatchObject({ name: "bugHunter", displayName: "Renamed", steps: ["/one"] });
+    const updated = await service.updateWorkflow("bugHunter", { ...sampleWorkflow, displayName: "Renamed", steps: ["one"] });
+    expect(updated).toMatchObject({ name: "bugHunter", displayName: "Renamed", steps: ["one"] });
     expect((await service.getWorkflow("bugHunter"))?.displayName).toBe("Renamed");
   });
 
@@ -130,10 +137,18 @@ describe("WorkflowService", () => {
     expect(await service.deleteWorkflow("bugHunter")).toBe(false);
   });
 
-  test("workflows round-trip multi-line steps through YAML", async () => {
+  test("workflows round-trip structured steps through YAML", async () => {
     const service = makeService(tempDir());
-    await service.createWorkflow("multiline", sampleWorkflow);
-    expect((await service.getWorkflow("multiline"))?.steps).toEqual(sampleWorkflow.steps);
+    await service.createWorkflow("structured", sampleWorkflow);
+    const loaded = await service.getWorkflow("structured");
+    expect(loaded?.steps).toEqual([
+      "Find every package in the monorepo",
+      {
+        command: "agent run",
+        arguments: { type: "code-quality-engineer" },
+        remainder: "Fix bugs in the packages",
+      },
+    ]);
   });
 });
 
@@ -160,14 +175,14 @@ describe("WorkflowService run tracking", () => {
     const app = createTestingApp();
     const agentManager = new AgentManager(app);
     agentManager.addAgentConfigs(agentConfig);
-    app.addServices(agentManager);
+    app.addService(agentManager);
 
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), "tr-workflow-"));
     tempDirs.push(dir);
 
     const service = new WorkflowService(app);
     service.reconfigure({ workflowDirectory: dir });
-    app.addServices(service);
+    app.addService(service);
     return { app, service };
   }
 
@@ -203,7 +218,7 @@ describe("WorkflowService run tracking", () => {
   }
 
   function waitForFinishedRun(app: TokenRingApp): Promise<WorkflowState> {
-    return app.stateManager.timedWaitForState(WorkflowState, state => state.runs.length > 0 && state.runs.every(run => isRunFinished(run.status)), 5000);
+    return app.timedWaitForState(WorkflowState, state => state.runs.length > 0 && state.runs.every(run => isRunFinished(run.status)), 5000);
   }
 
   test("spawnWorkflow records a run and walks it through every step", async () => {
@@ -228,6 +243,28 @@ describe("WorkflowService run tracking", () => {
     });
   });
 
+  test("structured command steps are formatted into agent messages when run", async () => {
+    const { app, service } = makeApp();
+    await service.createWorkflow("wf", {
+      displayName: "WF",
+      agentType: "leader",
+      steps: [
+        "plain chat",
+        {
+          command: "agent run",
+          arguments: { type: "leader", bg: true },
+          remainder: "do work",
+        },
+      ],
+    });
+
+    const agent = await service.spawnWorkflow("wf", { headless: true });
+    const executed = respondToSteps(agent, message => ({ status: "success", message: `ran ${message}` }));
+    await waitForFinishedRun(app);
+
+    expect(executed).toEqual(["plain chat", "/agent run --type leader --bg do work"]);
+  });
+
   test("a failing step stops the run and records where it stopped", async () => {
     const { app, service } = makeApp();
     await service.createWorkflow("wf", { displayName: "WF", agentType: "leader", steps: ["step1", "step2", "step3"] });
@@ -249,6 +286,6 @@ describe("WorkflowService run tracking", () => {
 
     await expect(service.spawnWorkflow("ghost", { headless: true })).rejects.toThrow('Workflow "ghost" not found.');
     await expect(service.spawnWorkflow("wf", { headless: true })).rejects.toThrow('uses agent type "does-not-exist", which does not exist.');
-    expect(app.stateManager.getState(WorkflowState).runs).toEqual([]);
+    expect(app.getState(WorkflowState).runs).toEqual([]);
   });
 });

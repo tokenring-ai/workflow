@@ -14,7 +14,7 @@ export default {
 /workflow list`,
   inputSchema,
   execute: async ({ agent }: AgentCommandInputType<typeof inputSchema>): Promise<string> => {
-    const workflowService = agent.requireServiceByType(WorkflowService);
+    const workflowService = agent.requireService(WorkflowService);
 
     const workflows = await workflowService.listWorkflows();
     if (workflows.length === 0) {

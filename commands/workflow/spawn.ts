@@ -7,8 +7,8 @@ const inputSchema = {
   positionals: [{ name: "workflowName", description: "Workflow name", required: true }],
 } as const satisfies AgentCommandInputSchema;
 
-async function execute({ positionals: { workflowName }, agent }: AgentCommandInputType<typeof inputSchema>): Promise<string> {
-  const workflowService = agent.requireServiceByType(WorkflowService);
+async function execute({ args: { workflowName }, agent }: AgentCommandInputType<typeof inputSchema>): Promise<string> {
+  const workflowService = agent.requireService(WorkflowService);
 
   const workflow = await workflowService.getWorkflow(workflowName);
   if (!workflow) throw new CommandFailedError(`Workflow "${workflowName}" not found.`);

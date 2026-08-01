@@ -3,6 +3,31 @@ import type { ConfigFieldMeta } from "@tokenring-ai/app/config/metadata";
 import z from "zod";
 
 /**
+ * A structured workflow step that invokes a registered agent command.
+ *
+ * - `command` is the command name without a leading slash (e.g. `"agent run"`).
+ * - `arguments` holds named `--arg` values and positional values keyed by schema name.
+ * - `remainder` is free-text trailing input (prompts, messages, etc.).
+ */
+export const WorkflowCommandStepSchema = z.object({
+  command: z.string().min(1),
+  arguments: z.record(z.string(), z.union([z.string(), z.number(), z.boolean()])).default({}),
+  remainder: z.string().default(""),
+});
+
+/**
+ * One workflow step:
+ * - a plain string is a chat message (fed to the agent without a leading `/`)
+ * - an object is a structured agent command
+ */
+export const WorkflowStepSchema = z.union([z.string(), WorkflowCommandStepSchema]);
+
+export type WorkflowCommandStep = z.output<typeof WorkflowCommandStepSchema>;
+export type WorkflowStep = z.output<typeof WorkflowStepSchema>;
+export type WorkflowCommandStepInput = z.input<typeof WorkflowCommandStepSchema>;
+export type WorkflowStepInput = z.input<typeof WorkflowStepSchema>;
+
+/**
  * The contents of a single workflow YAML file. The workflow name comes from the
  * file name, so it is not part of the file body.
  */
@@ -11,7 +36,7 @@ export const WorkflowItemSchema = z.object({
   category: z.string().default("User-Created Workflows"),
   description: z.string().default(""),
   agentType: z.string(),
-  steps: z.array(z.string()).default([]),
+  steps: z.array(WorkflowStepSchema).default([]),
   subAgent: SubAgentConfigSchema.prefault({}),
 });
 
@@ -43,7 +68,7 @@ export const WorkflowRunSchema = z.object({
   /** Null until the agent running the workflow has been created. */
   agentId: z.string().nullable(),
   /** The steps as they were when the run started; later edits to the workflow file don't affect it. */
-  steps: z.array(z.string()),
+  steps: z.array(WorkflowStepSchema),
   /** Index of the step being executed, or the index it stopped at; equals `steps.length` once completed. */
   currentStep: z.number(),
   status: WorkflowRunStatusSchema,
@@ -57,6 +82,10 @@ export type WorkflowRun = z.output<typeof WorkflowRunSchema>;
 
 export const WorkflowServiceConfigSchema = z
   .object({
+    maxFinishedRuns: z
+      .number()
+      .default(50)
+      .meta({ description: "Maximum number of completed workflow runs to keep in memory" } satisfies ConfigFieldMeta),
     workflowDirectory: z
       .string()
       .default("workflows")

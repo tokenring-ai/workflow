@@ -34,7 +34,7 @@ export default createRPCEndpoint(WorkflowRpcSchema, {
   },
 
   async *streamWorkflowRuns(_args, app: TokenRingApp, signal) {
-    for await (const state of app.stateManager.subscribeAsync(WorkflowState, signal)) {
+    for await (const state of app.subscribeStateAsync(WorkflowState, signal)) {
       yield { status: "success" as const, runs: state.runs.map(run => ({ ...run })) };
     }
   },

@@ -46,7 +46,7 @@ describe("workflow command", () => {
 
     workflowService = new WorkflowService(app);
     workflowService.reconfigure({ workflowDirectory });
-    app.addServices(workflowService);
+    app.addService(workflowService);
 
     agent = createTestingAgent(app);
     agent.config.headless = false;
@@ -75,8 +75,7 @@ describe("workflow command", () => {
       spyOn(workflowService, "spawnWorkflow").mockResolvedValue({ id: "spawned-agent-123" } as Agent);
 
       const result = await workflowSpawnCommand.execute({
-        positionals: { workflowName: "testWorkflow" },
-        args: {},
+        args: { workflowName: "testWorkflow" },
         agent,
       });
 
@@ -89,8 +88,7 @@ describe("workflow command", () => {
       spyOn(workflowService, "spawnWorkflow").mockResolvedValue({ id: "spawned-agent-123" } as Agent);
 
       await workflowSpawnCommand.execute({
-        positionals: { workflowName: "complexWorkflow" },
-        args: {},
+        args: { workflowName: "complexWorkflow" },
         agent,
       });
 
@@ -100,8 +98,7 @@ describe("workflow command", () => {
     it("should show error for non-existent workflow", async () => {
       expect(
         workflowSpawnCommand.execute({
-          positionals: { workflowName: "nonExistentWorkflow" },
-          args: {},
+          args: { workflowName: "nonExistentWorkflow" },
           agent,
         }),
       ).rejects.toThrow('Workflow "nonExistentWorkflow" not found.');

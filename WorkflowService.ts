@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import fs from "node:fs/promises";
 import path from "node:path";
-import { type Agent, AgentManager } from "@tokenring-ai/agent";
+import { type Agent, AgentCommandService, AgentManager } from "@tokenring-ai/agent";
 import { AgentEventState } from "@tokenring-ai/agent/state/agentEventState";
 import type TokenRingApp from "@tokenring-ai/app";
 import writeYamlAtomic from "@tokenring-ai/app/config/writeYamlAtomic";
@@ -9,6 +9,7 @@ import type { TokenRingService } from "@tokenring-ai/app/types";
 import { ConfigurationError } from "@tokenring-ai/app/types";
 import formatError from "@tokenring-ai/utility/error/formatError";
 import { YAML } from "bun";
+import { formatWorkflowStep } from "./formatWorkflowStep.ts";
 import {
   type ParsedWorkflowConfig,
   type Workflow,
@@ -16,6 +17,7 @@ import {
   WorkflowItemSchema,
   type WorkflowRun,
   WorkflowServiceConfigSchema,
+  type WorkflowStep,
 } from "./schema.ts";
 import { WorkflowState } from "./state/workflowState.ts";
 
@@ -57,7 +59,7 @@ export default class WorkflowService implements TokenRingService {
   private config = WorkflowServiceConfigSchema.parse({});
 
   constructor(private app: TokenRingApp) {
-    this.app.stateManager.initializeState(WorkflowState, MAX_FINISHED_RUNS);
+    this.app.initializeState(WorkflowState, MAX_FINISHED_RUNS);
   }
 
   reconfigure(newConfig: ParsedWorkflowConfig): void {
@@ -129,7 +131,7 @@ export default class WorkflowService implements TokenRingService {
 
   /** Every run this app has tracked, oldest first, including finished ones. */
   getRuns(): WorkflowRun[] {
-    return this.app.stateManager.getState(WorkflowState).runs;
+    return this.app.getState(WorkflowState).runs;
   }
 
   /**
@@ -148,7 +150,7 @@ export default class WorkflowService implements TokenRingService {
       throw new ConfigurationError(this.name, `Workflow "${workflowName}" uses agent type "${workflow.agentType}", which does not exist.`);
     }
 
-    const run = this.app.stateManager.mutateState(WorkflowState, state =>
+    const run = this.app.mutateState(WorkflowState, state =>
       state.addRun({
         id: randomUUID(),
         workflowName,
@@ -166,7 +168,7 @@ export default class WorkflowService implements TokenRingService {
       throw error;
     }
 
-    this.app.stateManager.mutateState(WorkflowState, state => state.updateRun(run.id, { agentId: agent.id }));
+    this.app.mutateState(WorkflowState, state => state.updateRun(run.id, { agentId: agent.id }));
 
     this.app.runBackgroundTask(this, signal => this.runWorkflowSteps(run.id, agent, workflowName, signal));
 
@@ -184,7 +186,7 @@ export default class WorkflowService implements TokenRingService {
    */
   private async runWorkflowSteps(runId: string, agent: Agent, workflowName: string, appSignal: AbortSignal): Promise<void> {
     const signal = AbortSignal.any([appSignal, agent.agentShutdownSignal]);
-    const steps = this.app.stateManager.getState(WorkflowState).getRun(runId)?.steps ?? [];
+    const steps = this.app.getState(WorkflowState).getRun(runId)?.steps ?? [];
     const from = `Workflow ${workflowName}`;
 
     try {
@@ -196,10 +198,10 @@ export default class WorkflowService implements TokenRingService {
           return;
         }
 
-        this.app.stateManager.mutateState(WorkflowState, state => state.updateRun(runId, { currentStep: index, status: "running" }));
+        this.app.mutateState(WorkflowState, state => state.updateRun(runId, { currentStep: index, status: "running" }));
 
         const result = await this.runStep(agent, step, from, signal);
-        this.app.stateManager.mutateState(WorkflowState, state => state.updateRun(runId, { message: result.message }));
+        this.app.mutateState(WorkflowState, state => state.updateRun(runId, { message: result.message }));
 
         if (result.status !== "success") {
           this.finishRun(runId, result.status === "cancelled" ? "cancelled" : "failed", result.message);
@@ -217,12 +219,14 @@ export default class WorkflowService implements TokenRingService {
   /** Sends a single step to the agent and resolves with the agent's response to that step. */
   private async runStep(
     agent: Agent,
-    step: string,
+    step: WorkflowStep,
     from: string,
     signal: AbortSignal,
   ): Promise<{ status: "success" | "error" | "cancelled"; message: string }> {
+    const commandService = this.app.getService(AgentCommandService);
+    const message = formatWorkflowStep(step, commandService);
     const cursor = agent.getState(AgentEventState).getEventCursorFromCurrentPosition();
-    const requestId = agent.handleInput({ from, message: step });
+    const requestId = agent.handleInput({ from, message });
 
     for await (const state of agent.subscribeStateAsync(AgentEventState, signal)) {
       for (const event of state.yieldEventsByCursor(cursor)) {
@@ -236,7 +240,7 @@ export default class WorkflowService implements TokenRingService {
   }
 
   private finishRun(runId: string, status: WorkflowRun["status"], message: string): void {
-    this.app.stateManager.mutateState(WorkflowState, state => state.finishRun(runId, status, message));
+    this.app.mutateState(WorkflowState, state => state.finishRun(runId, status, message));
   }
 
   private async readWorkflowFile(filePath: string, workflowName: string): Promise<Workflow | null> {
