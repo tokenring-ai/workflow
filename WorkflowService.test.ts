@@ -217,7 +217,7 @@ describe("WorkflowService run tracking", () => {
     return executed;
   }
 
-  function waitForFinishedRun(app: TokenRingApp): Promise<WorkflowState> {
+  function waitForFinishedRun(app: TokenRingApp): Promise<Readonly<WorkflowState>> {
     return app.timedWaitForState(WorkflowState, state => state.runs.length > 0 && state.runs.every(run => isRunFinished(run.status)), 5000);
   }
 
