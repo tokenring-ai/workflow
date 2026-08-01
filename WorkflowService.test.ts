@@ -30,7 +30,7 @@ describe("WorkflowService", () => {
 
   function makeService(workflowDirectory: string): WorkflowService {
     const service = new WorkflowService(app);
-    service.reconfigure({ workflowDirectory });
+    service.reconfigure({ maxFinishedRuns: 50, workflowDirectory });
     return service;
   }
 
@@ -181,7 +181,7 @@ describe("WorkflowService run tracking", () => {
     tempDirs.push(dir);
 
     const service = new WorkflowService(app);
-    service.reconfigure({ workflowDirectory: dir });
+    service.reconfigure({ maxFinishedRuns: 50, workflowDirectory: dir });
     app.addService(service);
     return { app, service };
   }
