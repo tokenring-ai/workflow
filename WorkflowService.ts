@@ -67,7 +67,7 @@ export default class WorkflowService implements TokenRingService {
   }
 
   getWorkflowDirectory(): string {
-    return path.resolve(this.app.appConfig.dataDirectory, this.config.workflowDirectory);
+    return this.app.getWorkspaceResolvedPath(this.config.workflowDirectory);
   }
 
   /**
