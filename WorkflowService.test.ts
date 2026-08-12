@@ -218,7 +218,12 @@ describe("WorkflowService run tracking", () => {
   }
 
   function waitForFinishedRun(app: TokenRingApp): Promise<Readonly<WorkflowState>> {
-    return app.timedWaitForState(WorkflowState, state => state.runs.length > 0 && state.runs.every(run => isRunFinished(run.status)), 5000);
+    return app.timedWaitForState(
+      WorkflowState,
+      state => state.runs.length > 0 && state.runs.every(run => isRunFinished(run.status)),
+      5000,
+      new AbortController().signal,
+    );
   }
 
   test("spawnWorkflow records a run and walks it through every step", async () => {

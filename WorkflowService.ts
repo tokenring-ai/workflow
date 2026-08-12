@@ -190,7 +190,7 @@ export default class WorkflowService implements TokenRingService {
     const from = `Workflow ${workflowName}`;
 
     try {
-      await agent.waitForState(AgentEventState, state => state.idle);
+      await agent.waitForState(AgentEventState, state => state.idle, signal);
 
       for (const [index, step] of steps.entries()) {
         if (signal.aborted) {
