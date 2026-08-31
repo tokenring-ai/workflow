@@ -1,4 +1,4 @@
-import { SubAgentConfigSchema } from "@tokenring-ai/agent/schema";
+import { InstallSourceSchema, SubAgentConfigSchema } from "@tokenring-ai/agent/schema";
 import type { ConfigFieldMeta } from "@tokenring-ai/app/config/metadata";
 import z from "zod";
 
@@ -38,6 +38,8 @@ export const WorkflowItemSchema = z.object({
   agentType: z.string(),
   steps: z.array(WorkflowStepSchema).default([]),
   subAgent: SubAgentConfigSchema.prefault({}),
+  /** Set when the workflow was installed from a marketplace registry rather than authored here. */
+  installedFrom: InstallSourceSchema.exactOptional(),
 });
 
 export type WorkflowItem = z.output<typeof WorkflowItemSchema>;

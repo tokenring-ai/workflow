@@ -19,7 +19,7 @@ export default {
   description: packageJSON.description,
   install(app) {
     app.waitForService(AgentCommandService, agentCommandService => agentCommandService.addAgentCommands(agentCommands));
-    app.addService(new WorkflowService(app));
+    app.addService(WorkflowService, new WorkflowService(app));
 
     app.waitForService(RpcService, rpcService => {
       rpcService.registerEndpoint(workflowRPC);

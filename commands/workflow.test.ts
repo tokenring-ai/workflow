@@ -46,7 +46,7 @@ describe("workflow command", () => {
 
     workflowService = new WorkflowService(app);
     workflowService.reconfigure({ maxFinishedRuns: 50, workflowDirectory });
-    app.addService(workflowService);
+    app.addService(WorkflowService, workflowService);
 
     agent = createTestingAgent(app);
     agent.config.headless = false;

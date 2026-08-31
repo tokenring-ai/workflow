@@ -175,14 +175,14 @@ describe("WorkflowService run tracking", () => {
     const app = createTestingApp();
     const agentManager = new AgentManager(app);
     agentManager.addAgentConfigs(agentConfig);
-    app.addService(agentManager);
+    app.addService(AgentManager, agentManager);
 
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), "tr-workflow-"));
     tempDirs.push(dir);
 
     const service = new WorkflowService(app);
     service.reconfigure({ maxFinishedRuns: 50, workflowDirectory: dir });
-    app.addService(service);
+    app.addService(WorkflowService, service);
     return { app, service };
   }
 
