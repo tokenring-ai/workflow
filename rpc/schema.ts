@@ -76,5 +76,14 @@ export default {
         description: z.string(),
       }),
     },
+    cancelRun: {
+      type: "mutation",
+      input: z.object({
+        runId: z.string(),
+      }),
+      result: z.object({
+        success: z.boolean(),
+      }),
+    },
   },
 } satisfies RPCSchema;

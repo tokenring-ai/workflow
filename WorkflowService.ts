@@ -9,23 +9,26 @@ import type { TokenRingService } from "@tokenring-ai/app/types";
 import { ConfigurationError } from "@tokenring-ai/app/types";
 import formatError from "@tokenring-ai/utility/error/formatError";
 import { YAML } from "bun";
-import { formatWorkflowStep } from "./formatWorkflowStep.ts";
+import { formatWorkflowStep, formatWorkflowStepLabel } from "./formatWorkflowStep.ts";
 import {
   type ParsedWorkflowConfig,
   type Workflow,
   type WorkflowItemInput,
   WorkflowItemSchema,
   type WorkflowRun,
+  WorkflowRunSchema,
+  type WorkflowRunStep,
   WorkflowServiceConfigSchema,
   type WorkflowStep,
 } from "./schema.ts";
-import { WorkflowState } from "./state/workflowState.ts";
+import { isRunFinished, WorkflowState } from "./state/workflowState.ts";
 
 const NAME_PATTERN = /^[a-zA-Z0-9][a-zA-Z0-9_-]*$/;
 const EXTENSION = ".yaml";
+const RUNS_DIRECTORY = ".runs";
 
-/** How many finished runs are kept in state for the UI's history. */
-const MAX_FINISHED_RUNS = 50;
+/** Longest step output kept in a run record; full responses still live in the agent's history. */
+const MAX_STEP_OUTPUT_CHARS = 4000;
 
 const FILE_HEADER = "# TokenRing workflow definition. The file name is the workflow name.";
 
@@ -44,13 +47,27 @@ async function pathExists(target: string): Promise<boolean> {
     .catch(() => false);
 }
 
+function truncateOutput(message: string): string {
+  return message.length > MAX_STEP_OUTPUT_CHARS ? `${message.slice(0, MAX_STEP_OUTPUT_CHARS)}…` : message;
+}
+
+/**
+ * Per-step execution options. Structured steps carry their own; plain-string
+ * steps use these defaults.
+ */
+function stepExecutionOptions(step: WorkflowStep): { onError: "stop" | "continue"; retries: number } {
+  return typeof step === "string" ? { onError: "stop", retries: 0 } : { onError: step.onError ?? "stop", retries: step.retries ?? 0 };
+}
+
 /**
  * Manages multi-step agent workflows stored as YAML files on disk, and runs them.
  *
- * Layout: `<workflowDirectory>/<name>.yaml`
+ * Layout: `<workflowDirectory>/<name>.yaml`, with finished runs archived under
+ * `<workflowDirectory>/.runs/<runId>.json`.
  *
  * Running a workflow spawns an agent of the workflow's agent type and feeds it one step at a time,
- * recording progress in {@link WorkflowState} so the UI can follow the run.
+ * recording progress (including per-step records) in {@link WorkflowState} and persisting run
+ * records to disk so history survives restarts.
  */
 export default class WorkflowService implements TokenRingService {
   readonly name = "WorkflowService";
@@ -58,16 +75,59 @@ export default class WorkflowService implements TokenRingService {
 
   private config = WorkflowServiceConfigSchema.parse({});
 
+  /** Abort controllers for in-flight runs, keyed by run id. */
+  private readonly runAbortControllers = new Map<string, AbortController>();
+
   constructor(private app: TokenRingApp) {
-    this.app.initializeState(WorkflowState, MAX_FINISHED_RUNS);
+    this.app.initializeState(WorkflowState, this.config.maxFinishedRuns);
   }
 
   reconfigure(newConfig: ParsedWorkflowConfig): void {
     this.config = newConfig;
+    this.app.getState(WorkflowState).setMaxFinishedRuns(newConfig.maxFinishedRuns);
   }
 
   getWorkflowDirectory(): string {
     return this.app.getWorkspaceResolvedPath(this.config.workflowDirectory);
+  }
+
+  private getRunsDirectory(): string {
+    return path.join(this.getWorkflowDirectory(), RUNS_DIRECTORY);
+  }
+
+  /**
+   * Loads run records persisted by previous sessions into state, so run history survives
+   * restarts. Runs that were still in flight when the process died are recorded as cancelled.
+   * Missing directory is normal (nothing has run yet); other read errors are logged, not fatal.
+   */
+  async loadRunHistory(): Promise<void> {
+    let entries: string[];
+    try {
+      entries = await fs.readdir(this.getRunsDirectory());
+    } catch (error: unknown) {
+      if ((error as NodeJS.ErrnoException).code === "ENOENT") return;
+      console.error(`Unable to read workflow run history: ${formatError(error)}`);
+      return;
+    }
+
+    const runs: WorkflowRun[] = [];
+    for (const entry of entries) {
+      if (!entry.endsWith(".json")) continue;
+      try {
+        const parsed = WorkflowRunSchema.parse(JSON.parse(await fs.readFile(path.join(this.getRunsDirectory(), entry), "utf8")));
+        runs.push(
+          isRunFinished(parsed.status) ? parsed : { ...parsed, status: "cancelled", message: "Interrupted by an application restart", finishedAt: Date.now() },
+        );
+      } catch (error) {
+        console.error(`Skipping invalid workflow run record ${entry}: ${formatError(error)}`);
+      }
+    }
+
+    runs.sort((a, b) => a.startedAt - b.startedAt);
+    this.app.mutateState(WorkflowState, state => {
+      state.runs = [...state.runs, ...runs];
+      state.trimFinishedRuns();
+    });
   }
 
   /**
@@ -79,8 +139,9 @@ export default class WorkflowService implements TokenRingService {
     let entries: string[];
     try {
       entries = await fs.readdir(root);
-    } catch {
-      return [];
+    } catch (error: unknown) {
+      if ((error as NodeJS.ErrnoException).code === "ENOENT") return [];
+      throw error;
     }
 
     const workflows: Workflow[] = [];
@@ -124,14 +185,35 @@ export default class WorkflowService implements TokenRingService {
     try {
       await fs.unlink(filePath);
       return true;
-    } catch {
-      return false;
+    } catch (error: unknown) {
+      if ((error as NodeJS.ErrnoException).code === "ENOENT") return false;
+      throw error;
     }
   }
 
-  /** Every run this app has tracked, oldest first, including finished ones. */
+  /** Every run this app has tracked, oldest first, including persisted and finished ones. */
   getRuns(): WorkflowRun[] {
     return this.app.getState(WorkflowState).runs;
+  }
+
+  /**
+   * Cancels an in-flight run: aborts its step loop and terminates the run's agent.
+   * Returns false when the run does not exist or is already finished.
+   */
+  cancelRun(runId: string): boolean {
+    const run = this.app.getState(WorkflowState).getRun(runId);
+    if (!run || isRunFinished(run.status)) return false;
+
+    this.runAbortControllers.get(runId)?.abort();
+    if (run.agentId) {
+      this.app.requireService(AgentManager).deleteAgent(run.agentId, `Workflow run cancelled`);
+    }
+    if (run.status === "starting") {
+      // The step loop may not have started yet; record the outcome now (the loop's
+      // abort check sees the finished run and exits without double-finishing).
+      this.finishRun(runId, "cancelled", "Run cancelled.");
+    }
+    return true;
   }
 
   /**
@@ -157,8 +239,10 @@ export default class WorkflowService implements TokenRingService {
         displayName: workflow.displayName,
         agentType: workflow.agentType,
         steps: workflow.steps,
+        stepRecords: this.buildStepRecords(workflow.steps),
       }),
     );
+    this.persistRun(run.id);
 
     let agent: Agent;
     try {
@@ -170,9 +254,27 @@ export default class WorkflowService implements TokenRingService {
 
     this.app.mutateState(WorkflowState, state => state.updateRun(run.id, { agentId: agent.id }));
 
-    this.app.runBackgroundTask(this, signal => this.runWorkflowSteps(run.id, agent, workflowName, signal));
+    const controller = new AbortController();
+    this.runAbortControllers.set(run.id, controller);
+    // The timeout comes from the workflow snapshot taken at spawn; the run never re-reads the file.
+    const timeoutSeconds = workflow.subAgent.timeout > 0 ? workflow.subAgent.timeout : null;
+    this.app.runBackgroundTask(this, signal => this.runWorkflowSteps(run.id, agent, workflowName, signal, controller, timeoutSeconds));
 
     return agent;
+  }
+
+  /** Per-run step records with human-readable labels formatted against the live command registry. */
+  private buildStepRecords(steps: WorkflowStep[]): WorkflowRunStep[] {
+    const commandService = this.app.getService(AgentCommandService);
+    return steps.map(step => {
+      let label: string;
+      try {
+        label = commandService ? formatWorkflowStep(step, commandService) : formatWorkflowStepLabel(step);
+      } catch {
+        label = formatWorkflowStepLabel(step);
+      }
+      return { label, status: "pending" as const, startedAt: null, finishedAt: null, output: "" };
+    });
   }
 
   private resolveWorkflowPath(workflowName: string): string {
@@ -182,10 +284,23 @@ export default class WorkflowService implements TokenRingService {
 
   /**
    * Runs the workflow's steps on `agent`, one at a time, waiting for each step's response before
-   * sending the next and stopping at the first step that does not succeed.
+   * sending the next. A step's `retries` re-run it after failures; `onError: "continue"` records
+   * the failure and keeps the run going. The run stops at the first unhandled failure, on
+   * cancellation (abort or agent shutdown), or when the configured timeout elapses.
    */
-  private async runWorkflowSteps(runId: string, agent: Agent, workflowName: string, appSignal: AbortSignal): Promise<void> {
-    const signal = AbortSignal.any([appSignal, agent.agentShutdownSignal]);
+  private async runWorkflowSteps(
+    runId: string,
+    agent: Agent,
+    workflowName: string,
+    appSignal: AbortSignal,
+    controller: AbortController,
+    timeoutSeconds: number | null,
+  ): Promise<void> {
+    const timeoutMs = timeoutSeconds !== null ? timeoutSeconds * 1000 : null;
+    const timeoutSignal = timeoutMs !== null ? AbortSignal.timeout(timeoutMs) : undefined;
+    const signals: AbortSignal[] = [appSignal, agent.agentShutdownSignal, controller.signal];
+    if (timeoutSignal) signals.push(timeoutSignal);
+    const signal = AbortSignal.any(signals);
     const steps = this.app.getState(WorkflowState).getRun(runId)?.steps ?? [];
     const from = `Workflow ${workflowName}`;
 
@@ -194,26 +309,69 @@ export default class WorkflowService implements TokenRingService {
 
       for (const [index, step] of steps.entries()) {
         if (signal.aborted) {
-          this.finishRun(runId, "cancelled", "Workflow was aborted.");
+          this.finishRun(runId, this.abortRunStatus(signal), this.abortRunMessage(signal, timeoutMs));
           return;
         }
 
-        this.app.mutateState(WorkflowState, state => state.updateRun(runId, { currentStep: index, status: "running" }));
+        this.updateRun(runId, state => state.startStep(runId, index));
 
-        const result = await this.runStep(agent, step, from, signal);
-        this.app.mutateState(WorkflowState, state => state.updateRun(runId, { message: result.message }));
+        const options = stepExecutionOptions(step);
+        let result = await this.runStep(agent, step, from, signal);
+        let attempts = 1;
+        while (result.status === "error" && attempts <= options.retries && !signal.aborted) {
+          result = await this.runStep(agent, step, from, signal);
+          attempts += 1;
+        }
 
-        if (result.status !== "success") {
-          this.finishRun(runId, result.status === "cancelled" ? "cancelled" : "failed", result.message);
+        if (result.status === "success") {
+          this.updateRun(runId, state =>
+            state.endStep(runId, index, "done", attempts > 1 ? `[retried ${attempts - 1}x] ${truncateOutput(result.message)}` : truncateOutput(result.message)),
+          );
+          this.updateRun(runId, state => state.updateRun(runId, { message: result.message }));
+          continue;
+        }
+
+        if (result.status === "cancelled" || signal.aborted) {
+          this.updateRun(runId, state => state.endStep(runId, index, "cancelled", truncateOutput(result.message)));
+          this.finishRun(runId, "cancelled", result.message);
           return;
         }
+
+        // The step failed (after any retries).
+        this.updateRun(runId, state =>
+          state.endStep(runId, index, "failed", attempts > 1 ? `[${attempts} attempts] ${truncateOutput(result.message)}` : truncateOutput(result.message)),
+        );
+        if (options.onError === "continue") {
+          this.updateRun(runId, state => state.updateRun(runId, { message: `Step ${index + 1} failed (continuing): ${result.message}` }));
+          continue;
+        }
+        this.finishRun(runId, "failed", `Step ${index + 1} failed: ${result.message}`);
+        return;
       }
 
+      if (signal.aborted) {
+        this.finishRun(runId, this.abortRunStatus(signal), this.abortRunMessage(signal, timeoutMs));
+        return;
+      }
       this.finishRun(runId, "completed", `Workflow "${workflowName}" completed`);
     } catch (error) {
       this.app.serviceError(this, `Workflow "${workflowName}" failed:`, error);
       this.finishRun(runId, "failed", formatError(error));
+    } finally {
+      this.runAbortControllers.delete(runId);
     }
+  }
+
+  /** How to record a run that ended because its signal aborted. */
+  private abortRunStatus(signal: AbortSignal): WorkflowRun["status"] {
+    return signal.reason?.name === "TimeoutError" ? "failed" : "cancelled";
+  }
+
+  private abortRunMessage(signal: AbortSignal, timeoutSeconds: number | null): string {
+    if (signal.reason?.name === "TimeoutError") {
+      return `Workflow timed out after ${timeoutSeconds ?? 0} seconds.`;
+    }
+    return "Workflow was aborted.";
   }
 
   /** Sends a single step to the agent and resolves with the agent's response to that step. */
@@ -239,8 +397,59 @@ export default class WorkflowService implements TokenRingService {
     return { status: "cancelled", message: "Agent stopped before the step completed." };
   }
 
+  /** Mutates run state through `mutate` and persists the resulting snapshot to disk. */
+  private updateRun(runId: string, mutate: (state: WorkflowState) => void): void {
+    this.app.mutateState(WorkflowState, state => mutate(state));
+    this.persistRun(runId);
+  }
+
   private finishRun(runId: string, status: WorkflowRun["status"], message: string): void {
     this.app.mutateState(WorkflowState, state => state.finishRun(runId, status, message));
+    this.persistRun(runId);
+  }
+
+  // ─── Run persistence ─────────────────────────────────────────────────────────
+
+  /**
+   * Serializes ALL persistence through one queue: a run's snapshot is read fresh
+   * inside its queued task, and every finished-run write is followed by a prune,
+   * so the last task always reflects the final state. Best-effort: failures are
+   * logged, never thrown.
+   */
+  private persistQueue: Promise<void> = Promise.resolve();
+
+  private persistRun(runId: string): void {
+    this.persistQueue = this.persistQueue
+      .then(async () => {
+        const run = this.app.getState(WorkflowState).getRun(runId);
+        if (!run) return;
+        await fs.mkdir(this.getRunsDirectory(), { recursive: true });
+        await fs.writeFile(path.join(this.getRunsDirectory(), `${runId}.json`), JSON.stringify(run, null, 2));
+        if (isRunFinished(run.status)) await this.prunePersistedRuns();
+      })
+      .catch((error: unknown) => {
+        console.error(`Unable to persist workflow run ${runId}: ${formatError(error)}`);
+      });
+  }
+
+  /** Deletes persisted run records that state no longer keeps, so disk mirrors memory exactly. */
+  private async prunePersistedRuns(): Promise<void> {
+    const runsDirectory = this.getRunsDirectory();
+    let entries: string[];
+    try {
+      entries = await fs.readdir(runsDirectory);
+    } catch {
+      return;
+    }
+
+    const kept = new Set(this.app.getState(WorkflowState).runs.map(run => run.id));
+    for (const entry of entries) {
+      if (!entry.endsWith(".json")) continue;
+      const runId = entry.slice(0, -".json".length);
+      if (!kept.has(runId)) {
+        await fs.rm(path.join(runsDirectory, entry), { force: true }).catch(() => {});
+      }
+    }
   }
 
   private async readWorkflowFile(filePath: string, workflowName: string): Promise<Workflow | null> {

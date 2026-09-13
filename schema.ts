@@ -8,12 +8,43 @@ import z from "zod";
  * - `command` is the command name without a leading slash (e.g. `"agent run"`).
  * - `arguments` holds named `--arg` values and positional values keyed by schema name.
  * - `remainder` is free-text trailing input (prompts, messages, etc.).
+ * - `onError: "continue"` keeps the run going when the step fails; `"stop"` (default) ends the run.
+ * - `retries` re-runs a failed step up to N times before the failure is handled.
  */
 export const WorkflowCommandStepSchema = z.object({
   command: z.string().min(1),
   arguments: z.record(z.string(), z.union([z.string(), z.number(), z.boolean()])).default({}),
   remainder: z.string().default(""),
+  onError: z
+    .enum(["stop", "continue"])
+    .optional()
+    .meta({ description: "continue keeps the run going when this step fails; stop (default) ends the run" } satisfies ConfigFieldMeta),
+  retries: z
+    .number()
+    .int()
+    .min(0)
+    .optional()
+    .meta({ description: "Re-run a failed step up to this many times before handling the failure" } satisfies ConfigFieldMeta),
 });
+
+/** Per-step execution options; plain-string steps use these defaults. */
+export const STEP_DEFAULTS = { onError: "stop", retries: 0 } as const;
+
+/** Execution status of a single step within a run. */
+export const WorkflowRunStepStatusSchema = z.enum(["pending", "running", "done", "failed", "skipped", "cancelled"]);
+export type WorkflowRunStepStatus = z.output<typeof WorkflowRunStepStatusSchema>;
+
+/** What actually happened to one step in one run — recorded as the run progresses. */
+export const WorkflowRunStepSchema = z.object({
+  /** Human-readable command/text shown in the UI. */
+  label: z.string(),
+  status: WorkflowRunStepStatusSchema,
+  startedAt: z.number().nullable(),
+  finishedAt: z.number().nullable(),
+  /** The agent's response to the step (truncated). */
+  output: z.string(),
+});
+export type WorkflowRunStep = z.output<typeof WorkflowRunStepSchema>;
 
 /**
  * One workflow step:
@@ -71,6 +102,8 @@ export const WorkflowRunSchema = z.object({
   agentId: z.string().nullable(),
   /** The steps as they were when the run started; later edits to the workflow file don't affect it. */
   steps: z.array(WorkflowStepSchema),
+  /** What happened to each step, in order. Older runs (and persistence from older versions) may lack records. */
+  stepRecords: z.array(WorkflowRunStepSchema).default([]),
   /** Index of the step being executed, or the index it stopped at; equals `steps.length` once completed. */
   currentStep: z.number(),
   status: WorkflowRunStatusSchema,
@@ -86,8 +119,9 @@ export const WorkflowServiceConfigSchema = z
   .object({
     maxFinishedRuns: z
       .number()
+      .min(1)
       .default(50)
-      .meta({ description: "Maximum number of completed workflow runs to keep in memory" } satisfies ConfigFieldMeta),
+      .meta({ description: "Maximum number of completed workflow runs to keep, in memory and under <workflowDirectory>/.runs" } satisfies ConfigFieldMeta),
     workflowDirectory: z
       .string()
       .default("workflows")

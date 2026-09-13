@@ -52,6 +52,7 @@ await pluginManager.installPlugins([workflowPlugin]);
 |--------------------------|------------------------------------------------------------------------------|
 | `/workflow list`         | List all available workflows with their names, descriptions, and step counts |
 | `/workflow spawn <name>` | Spawn a new agent and run a workflow on it                                   |
+| `/workflow cancel <runId\|name>` | Cancel an in-flight workflow run by run id or workflow name          |
 
 ### `/workflow list`
 
@@ -88,7 +89,7 @@ workflows:
 
 | Field                | Type     | Required | Default      | Description                                              |
 |----------------------|----------|----------|--------------|----------------------------------------------------------|
-| `maxFinishedRuns`    | `number` | no       | `50`         | Maximum number of completed workflow runs to keep in memory |
+| `maxFinishedRuns`    | `number` | no       | `50`         | Maximum number of completed workflow runs to keep, in memory and under `<workflowDirectory>/.runs` |
 | `workflowDirectory`  | `string` | no       | `"workflows"` | Directory where workflow YAML files are stored          |
 
 `workflowDirectory` is resolved relative to the application's workspace directory via
@@ -99,7 +100,7 @@ workflows:
 | Field               | Meta                                                                   |
 |---------------------|------------------------------------------------------------------------|
 | `workflows`         | label: `Workflows`, description: `Reusable multi-step workflows, backed by YAML files on disk` |
-| `maxFinishedRuns`   | description: `Maximum number of completed workflow runs to keep in memory` |
+| `maxFinishedRuns`   | description: `Maximum number of completed workflow runs to keep, in memory and under <workflowDirectory>/.runs` |
 | `workflowDirectory` | description: `Directory where workflow YAML files are stored`          |
 
 ### Workflow File Format

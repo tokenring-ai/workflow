@@ -3,14 +3,16 @@
   "description": "Service for defining and running linear, multi-step agent processes.",
   "version": "0.2.0",
   "dependencies": {
-    "@tokenring-ai/app": "workspace:*",
     "@tokenring-ai/agent": "workspace:*",
+    "@tokenring-ai/app": "workspace:*",
     "@tokenring-ai/rpc": "workspace:*",
     "@tokenring-ai/utility": "workspace:*",
+    "yaml": "^2.9.0",
     "zod": "^4.4.3"
   },
   "exports": {
     ".": "./index.ts",
+    "./frontend/*": "./frontend/*",
     "./*": "./*.ts"
   },
   "license": "MIT",

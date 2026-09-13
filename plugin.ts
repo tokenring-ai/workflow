@@ -18,8 +18,12 @@ export default {
   version: packageJSON.version,
   description: packageJSON.description,
   install(app) {
+    const workflowService = new WorkflowService(app);
+    app.addService(WorkflowService, workflowService);
+    // Restore persisted run history in the background; the UI streams whatever is in state.
+    void workflowService.loadRunHistory();
+
     app.waitForService(AgentCommandService, agentCommandService => agentCommandService.addAgentCommands(agentCommands));
-    app.addService(WorkflowService, new WorkflowService(app));
 
     app.waitForService(RpcService, rpcService => {
       rpcService.registerEndpoint(workflowRPC);

@@ -50,4 +50,8 @@ export default createRPCEndpoint(WorkflowRpcSchema, {
       description: agent.config.description,
     };
   },
+
+  cancelRun(args, app: TokenRingApp) {
+    return { success: app.requireService(WorkflowService).cancelRun(args.runId) };
+  },
 });
