@@ -1,11 +1,13 @@
 import NavigationSidebarHeader from "@tokenring-ai/one-frontend/components/layout/NavigationSidebarHeader.tsx";
 import SidebarCategoryAccordion from "@tokenring-ai/one-frontend/components/layout/SidebarCategoryAccordion.tsx";
+import BusySpinner from "@tokenring-ai/one-frontend/components/ui/BusySpinner.tsx";
 import ErrorState from "@tokenring-ai/one-frontend/components/ui/ErrorState.tsx";
 import LaunchButton from "@tokenring-ai/one-frontend/components/ui/LaunchButton.tsx";
 import ListItemWithActions from "@tokenring-ai/one-frontend/components/ui/ListItemWithActions.tsx";
 import { formatRelativeTime } from "@tokenring-ai/utility/date/formatRelativeTime";
 import type { Workflow, WorkflowRun } from "@tokenring-ai/workflow/schema";
-import { CheckCircle2, GitBranch, History, LayoutDashboard, Loader2, Plus, Store, X, XCircle } from "lucide-react";
+import { CheckCircle2, Copy, GitBranch, History, LayoutDashboard, Loader2, Plus, Store, Upload, X, XCircle } from "lucide-react";
+import { useRef } from "react";
 import { DEFAULT_CATEGORY, matchesWorkflowFilter, workflowTitle } from "../lib/drafts.ts";
 import { openRunLabel, RunningCountBadge, runStepSummary, runTitle } from "./RunPanels.tsx";
 
@@ -27,6 +29,9 @@ export function WorkflowSidebar({
   onSelectRunWorkflow,
   onGoOverview,
   onBrowseMarketplace,
+  onImportFile,
+  onDuplicate,
+  duplicatingName,
 }: {
   workflows: Workflow[];
   isLoading: boolean;
@@ -47,7 +52,12 @@ export function WorkflowSidebar({
   onSelectRunWorkflow: (workflowName: string) => void;
   onGoOverview: () => void;
   onBrowseMarketplace: () => void;
+  /** A workflow YAML file the user picked to import. */
+  onImportFile: (file: File) => void;
+  onDuplicate: (name: string) => void;
+  duplicatingName: string | null;
 }) {
+  const importInputRef = useRef<HTMLInputElement>(null);
   return (
     <div className="h-full flex flex-col bg-secondary border-r border-primary">
       <NavigationSidebarHeader
@@ -68,6 +78,13 @@ export function WorkflowSidebar({
             onClick: onBrowseMarketplace,
           },
           {
+            key: "import",
+            icon: <Upload className="w-3.5 h-3.5" />,
+            label: "Import workflow from YAML",
+            title: "Import workflow from YAML",
+            onClick: () => importInputRef.current?.click(),
+          },
+          {
             key: "new",
             icon: <Plus className="w-3.5 h-3.5" />,
             label: "New workflow",
@@ -75,6 +92,21 @@ export function WorkflowSidebar({
             onClick: onNew,
           },
         ]}
+      />
+
+      <input
+        ref={importInputRef}
+        type="file"
+        accept=".yaml,.yml,application/yaml,text/yaml"
+        className="hidden"
+        aria-label="Workflow YAML file to import"
+        data-testid="workflow-import-input"
+        onChange={event => {
+          const file = event.target.files?.[0];
+          // Reset so picking the same file again still fires a change.
+          event.target.value = "";
+          if (file) onImportFile(file);
+        }}
       />
 
       <div className="flex-1 overflow-y-auto">
@@ -95,7 +127,7 @@ export function WorkflowSidebar({
                 aria-label={openRunLabel(run)}
                 title={runStepSummary(run)}
               >
-                <div className="w-3 h-3 border-2 border-amber-500/30 border-t-amber-500 rounded-full animate-spin shrink-0" />
+                <BusySpinner />
                 <div className="min-w-0 flex-1">
                   <div className="text-xs font-medium text-primary truncate">{runTitle(run)}</div>
                   <div className="text-xs text-muted truncate">{runStepSummary(run)}</div>
@@ -189,15 +221,29 @@ export function WorkflowSidebar({
                 primaryProps={{ title: workflow.displayName }}
                 className={`gap-0.5 pl-5 pr-1.5 py-1 rounded-none ${isSelected ? "bg-accent-muted text-accent" : "text-primary"}`}
                 action={
-                  <LaunchButton
-                    loading={isLaunching}
-                    onClick={() => onRun(workflow.name)}
-                    variant="icon"
-                    iconSize="sm"
-                    title={`Run ${workflowTitle(workflow)}`}
-                    aria-label={`Run ${workflowTitle(workflow)}`}
-                    bgClassName={isSelected ? "text-accent hover:bg-accent/15" : "text-muted hover:text-cyan-600 dark:hover:text-cyan-400 hover:bg-cyan-500/10"}
-                  />
+                  <span className="flex items-center gap-0.5">
+                    <button
+                      type="button"
+                      onClick={() => onDuplicate(workflow.name)}
+                      disabled={duplicatingName !== null}
+                      title={`Duplicate ${workflowTitle(workflow)}`}
+                      aria-label={`Duplicate ${workflowTitle(workflow)}`}
+                      className="p-1 rounded text-muted hover:text-primary hover:bg-hover transition-colors cursor-pointer focus-ring disabled:opacity-40 disabled:cursor-not-allowed"
+                    >
+                      {duplicatingName === workflow.name ? <Loader2 className="w-3 h-3 animate-spin" /> : <Copy className="w-3 h-3" />}
+                    </button>
+                    <LaunchButton
+                      loading={isLaunching}
+                      onClick={() => onRun(workflow.name)}
+                      variant="icon"
+                      iconSize="sm"
+                      title={`Run ${workflowTitle(workflow)}`}
+                      aria-label={`Run ${workflowTitle(workflow)}`}
+                      bgClassName={
+                        isSelected ? "text-accent hover:bg-accent/15" : "text-muted hover:text-cyan-600 dark:hover:text-cyan-400 hover:bg-cyan-500/10"
+                      }
+                    />
+                  </span>
                 }
               >
                 <span className="flex items-center gap-1.5 py-0.5 min-w-0">

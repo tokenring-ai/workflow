@@ -24,6 +24,7 @@ The package provides chat commands for interactive use, JSON-RPC endpoints for t
 - **AgentCommandService**: registers the `/workflow` chat commands
 - **AgentManager**: spawns the workflow agent and validates the workflow's agent type
 - **RpcService**: exposes the workflow endpoints to clients
+- **ChatService**: registers the `workflow_*` agent tools
 - **Configuration System**: supplies (and can reconfigure) the workflow directory
 
 ## Installation
@@ -74,7 +75,17 @@ progress is followed through `WorkflowState` (see below), not by waiting on the 
 
 ## Tools
 
-This package does not define any tools.
+Registered with `ChatService` (enable them on an agent type like any other tool):
+
+| Tool | Approval | Description |
+|------|----------|-------------|
+| `workflow_list` | no | Lists saved workflows: name, display name, category, agent type, step count. |
+| `workflow_get` | no | Reads one workflow in full, including its steps. |
+| `workflow_create` | **yes** | Creates a workflow (`name`, `displayName`, `description?`, `category?`, `agentType`, `steps`). Refuses existing names and unknown agent types before asking. |
+| `workflow_update` | **yes** | Replaces only the fields passed (`steps`, when given, replaces the whole list). Refuses unknown workflows, empty changes and unknown agent types before asking. |
+
+Write tools show the user the workflow's name, agent type and numbered steps (with `onError`/`retries`) in the
+approval prompt; a declined approval writes nothing and fails the tool call.
 
 ## Configuration
 
@@ -164,6 +175,11 @@ steps:
 | `command`    | `string`                                       | yes      | —       | Command name without a leading slash (e.g. `"agent run"`)          |
 | `arguments`  | `Record<string, string \| number \| boolean>`  | no       | `{}`    | Named `--arg` values and positional values keyed by schema name    |
 | `remainder`  | `string`                                       | no       | `""`    | Free-text trailing input (prompts, messages, etc.)                 |
+| `onError`    | `"stop" \| "continue"`                         | no       | `stop`  | `continue` records the failure and runs the next step              |
+| `retries`    | `number` (integer ≥ 0)                         | no       | `0`     | Re-run a failed step up to this many times before handling the failure |
+
+The Workflows editor exposes `onError` and `retries` on every command step ("On failure" and "Retries", capped at 10
+in the UI); defaults are omitted from the saved YAML. Plain-string steps always use the defaults.
 
 When the step is executed, `formatWorkflowStep` resolves the command's input schema from the live
 `AgentCommandService` registry and formats the step into a `/command --args ... remainder` string. Arguments not
@@ -212,8 +228,11 @@ Running a workflow spawns an agent of the workflow's agent type and feeds it one
 | `getWorkflowDirectory(): string` | Returns the resolved workflow directory path (via `app.getWorkspaceResolvedPath`). |
 | `listWorkflows(): Promise<Workflow[]>` | Every valid workflow in the directory, sorted by name. Files that fail to parse are skipped. |
 | `getWorkflow(workflowName: string): Promise<Workflow \| null>` | A single workflow, or `null` when the file does not exist. |
-| `createWorkflow(workflowName: string, workflow: WorkflowItemInput): Promise<Workflow>` | Writes a new workflow file; throws when one already exists. |
+| `createWorkflow(workflowName: string, workflow: WorkflowItemInput): Promise<Workflow>` | Writes a new workflow file; throws when one already exists or the name is reserved by a dashboard route (`new`, `marketplace`). |
 | `updateWorkflow(workflowName: string, workflow: WorkflowItemInput): Promise<Workflow>` | Overwrites an existing workflow file; throws when it does not exist. |
+| `exportWorkflow(workflowName: string): Promise<{ fileName, yaml }>` | Workflow YAML for download: the body plus a `name` hint, without `installedFrom`/`updatedAt`. |
+| `importWorkflow(yaml: string, name?: string): Promise<Workflow>` | Creates a workflow from YAML. `name` overrides the file's `name` key; the body is schema-validated (errors list each issue's path) and an existing or reserved name is refused. |
+| `duplicateWorkflow(workflowName: string, newName?: string): Promise<Workflow>` | Copies a workflow as `newName` or the first free `<name>-copy`, `<name>-copy2`, …, with "(copy)" appended to the display name and no marketplace origin. |
 | `deleteWorkflow(workflowName: string): Promise<boolean>` | Deletes the workflow file, returning `false` when there was nothing to delete. |
 | `spawnWorkflow(workflowName: string, options: { headless: boolean }): Promise<Agent>` | Spawns an agent of the workflow's agent type, registers the run in `WorkflowState`, and starts running steps in the background. Returns as soon as the agent exists. |
 | `getRuns(): WorkflowRun[]` | Every tracked run, oldest first, including finished ones. |
@@ -304,7 +323,8 @@ This plugin is service-only (no agent lifecycle hooks).
 
 1. Waits for `AgentCommandService` and registers the `/workflow list` and `/workflow spawn` commands.
 2. Creates and adds a `WorkflowService` instance via `app.addService(new WorkflowService(app))`.
-3. Waits for `RpcService` and registers the `/rpc/workflow` endpoint.
+3. Waits for `ChatService` and registers the `workflow_list`, `workflow_get`, `workflow_create` and `workflow_update` tools.
+4. Waits for `RpcService` and registers the `/rpc/workflow` endpoint.
 
 **`reconfigure(app, config)`:**
 
@@ -323,6 +343,9 @@ Registered under `/rpc/workflow`:
 | `getWorkflow`          | `query`   | Returns `{ workflow: Workflow \| null }` for the given `name`.           |
 | `createWorkflow`       | `mutation`| Creates a workflow from `{ name, workflow }`; returns `{ workflow }`.    |
 | `updateWorkflow`       | `mutation`| Overwrites a workflow from `{ name, workflow }`; returns `{ workflow }`. |
+| `duplicateWorkflow`    | `mutation`| Copies `{ name, newName? }` (default name `<name>-copy[N]`); returns `{ workflow }`. |
+| `exportWorkflow`       | `query`   | Returns `{ fileName, yaml }` for downloading the workflow named `name`. |
+| `importWorkflow`       | `mutation`| Creates a workflow from `{ yaml, name? }` (validated; existing names refused); returns `{ workflow }`. |
 | `deleteWorkflow`       | `mutation`| Deletes a workflow by `name`; returns `{ success: boolean }`.            |
 | `spawnWorkflow`        | `mutation`| Spawns a workflow from `{ name, headless? }` (headless defaults to `false`); returns `{ id, displayName, description }`. |
 | `streamWorkflowRuns`   | `stream`  | State subscription stream that yields `{ status, runs }` on every state change. |
@@ -330,7 +353,9 @@ Registered under `/rpc/workflow`:
 Each workflow object is `{ name, displayName, category, description, agentType, steps, subAgent, updatedAt }`.
 
 The frontend Workflows app uses these endpoints to list workflows by category, view and edit a workflow's steps and
-settings, create and delete workflows, launch one on a new agent, and follow running workflows step by step.
+settings, create and delete workflows, launch one on a new agent, and follow running workflows step by step. The
+navigator's Import button (upload icon) reads a `.yaml` file and asks for a name, pre-filled from the file and blocked
+while it is invalid or taken; each row has a Duplicate action; the editor header has a Download button.
 
 ## Package Exports
 
@@ -352,6 +377,7 @@ The plugin definition is exported from `plugin.ts` (not re-exported by `index.ts
 |---------|---------|
 | `@tokenring-ai/app` | Application framework, atomic YAML writes, configuration, state management |
 | `@tokenring-ai/agent` | Agent orchestration, sub-agent configuration schema, agent command types |
+| `@tokenring-ai/chat` | Agent tool registration (`ChatService`) |
 | `@tokenring-ai/rpc` | JSON-RPC endpoint management |
 | `@tokenring-ai/utility` | Error formatting and string helpers |
 | `zod` | Schema validation |
@@ -368,6 +394,12 @@ bun test --coverage   # with coverage
   invalid files), name validation, schema defaults, and structured step round-tripping through YAML. It also covers run
   tracking: stepping a run to completion, stopping at a failing step, structured command step formatting during
   execution, and refusing unknown workflows or agent types.
+- `WorkflowService.test.ts` also covers export/import round-tripping, import validation and name collisions, reserved
+  names, and duplicate naming.
+- `tools/workflowTools.test.ts` covers the agent tools: approval gating (declined writes change nothing), refusing
+  existing names and unknown agent types, partial updates, and read-only listing.
+- `frontend/views/workflows.test.tsx` covers the dashboard views, including import (collision blocking, server errors),
+  duplicate, download, and editing a step's failure handling and retries.
 - `commands/workflow.test.ts` covers the chat commands against a temporary workflow directory, including listing
   workflows, spawning agents, inheriting headless mode, and erroring on non-existent workflows.
 - `formatWorkflowStep.test.ts` covers step formatting: plain string pass-through, flag and named-arg emission,
@@ -385,6 +417,8 @@ plugin/workflow/
 ├── WorkflowService.test.ts       # Service unit tests (CRUD + run tracking)
 ├── formatWorkflowStep.ts         # Step-to-agent-input formatting utilities
 ├── formatWorkflowStep.test.ts    # Formatting unit tests
+├── tools.ts                      # Agent tool registry
+├── tools/                        # workflow_list / workflow_get / workflow_create / workflow_update
 ├── commands.ts                   # Command registry
 ├── commands/
 │   ├── workflow/

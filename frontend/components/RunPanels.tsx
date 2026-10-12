@@ -1,11 +1,15 @@
+import BusySpinner from "@tokenring-ai/one-frontend/components/ui/BusySpinner.tsx";
+import ConfirmModal from "@tokenring-ai/one-frontend/components/ui/ConfirmModal.tsx";
 import HistoryRunRow, { type HistoryRunStatus } from "@tokenring-ai/one-frontend/components/ui/HistoryRunRow.tsx";
 import LaunchButton from "@tokenring-ai/one-frontend/components/ui/LaunchButton.tsx";
 import StatusBadge, { type StatusBadgeDefinition } from "@tokenring-ai/one-frontend/components/ui/StatusBadge.tsx";
 import { formatStepLabel } from "@tokenring-ai/one-frontend/features/workflows/commandStep.ts";
+import { runOrConfirm } from "@tokenring-ai/one-frontend/lib/uiPreferences.ts";
 import { cn } from "@tokenring-ai/one-frontend/lib/utils.ts";
 import { formatDurationMs } from "@tokenring-ai/utility/date/formatDuration";
 import type { WorkflowRun, WorkflowRunStatus } from "@tokenring-ai/workflow/schema";
-import { CheckCircle2, Circle, ExternalLink, History, Loader2, OctagonX, X, XCircle } from "lucide-react";
+import { CheckCircle2, Circle, ExternalLink, History, Loader2, OctagonX, RotateCcw, X, XCircle } from "lucide-react";
+import { useState } from "react";
 
 export function isRunActive(run: WorkflowRun): boolean {
   return run.status === "starting" || run.status === "running";
@@ -25,6 +29,12 @@ export function sortRunsNewestFirst(runs: WorkflowRun[]): WorkflowRun[] {
     const bTime = b.finishedAt ?? b.startedAt;
     return bTime - aTime;
   });
+}
+
+/** How long a finished step took, from its record; null while it runs or when it never started. */
+export function stepDurationLabel(record: { startedAt: number | null; finishedAt: number | null } | undefined): string | null {
+  if (record?.startedAt == null || record.finishedAt == null) return null;
+  return formatDurationMs(Math.max(0, record.finishedAt - record.startedAt));
 }
 
 function runDurationLabel(run: WorkflowRun): string | null {
@@ -70,7 +80,7 @@ export function RunningWorkflowCard({ run, onOpen }: { run: WorkflowRun; onOpen:
       aria-label={openRunLabel(run)}
     >
       <span className="shrink-0 inline-flex" aria-hidden="true">
-        <span className="w-3.5 h-3.5 border-2 border-amber-500/30 border-t-amber-500 rounded-full animate-spin" />
+        <BusySpinner size="sm" />
       </span>
       <span className="min-w-0 flex-1">
         <span className="flex items-center gap-1.5 min-w-0">
@@ -158,16 +168,30 @@ export function ActiveRunPanel({
   onOpenAgent,
   onCancel,
   cancelling,
+  onRerun,
+  rerunning = false,
 }: {
   run: WorkflowRun;
   onOpenAgent: (id: string) => void;
   onCancel: (run: WorkflowRun) => void;
   cancelling: boolean;
+  /** Offered once the run has finished: launches the same workflow again. */
+  onRerun?: (run: WorkflowRun) => void;
+  rerunning?: boolean;
 }) {
   const active = isRunActive(run);
+  const [confirmingCancel, setConfirmingCancel] = useState(false);
+  const requestCancel = () =>
+    runOrConfirm(
+      "Cancel workflow run?",
+      () => setConfirmingCancel(true),
+      () => onCancel(run),
+    );
 
-  // Prefer the backend's per-step records; older runs fall back to the index-derived states.
-  const useRecords = run.stepRecords?.length === run.steps.length;
+  // Prefer the backend's per-step records; older runs fall back to the index-derived states. The
+  // schema defaults the array, so the declared type says it is always there, but runs that predate
+  // the field still reach the UI without one - hence the runtime check rather than a plain read.
+  const useRecords = Array.isArray(run.stepRecords) && run.stepRecords.length === run.steps.length;
 
   return (
     <div
@@ -195,11 +219,22 @@ export function ActiveRunPanel({
         {active && (
           <button
             type="button"
-            onClick={() => onCancel(run)}
+            onClick={requestCancel}
             disabled={cancelling}
             className="flex items-center gap-1 px-2 py-1 text-xs font-medium text-muted hover:text-red-500 hover:bg-red-500/10 rounded-lg transition-colors cursor-pointer focus-ring disabled:opacity-50 shrink-0"
           >
             {cancelling ? <Loader2 className="w-3 h-3 animate-spin" /> : <OctagonX className="w-3 h-3" />} Cancel
+          </button>
+        )}
+        {onRerun && isRunFinished(run) && (
+          <button
+            type="button"
+            onClick={() => onRerun(run)}
+            disabled={rerunning}
+            title="Launch this workflow again on a new agent"
+            className="flex items-center gap-1 px-2 py-1 text-xs font-medium text-muted hover:text-primary hover:bg-hover rounded-lg transition-colors cursor-pointer focus-ring disabled:opacity-50 shrink-0"
+          >
+            {rerunning ? <Loader2 className="w-3 h-3 animate-spin" /> : <RotateCcw className="w-3 h-3" />} Re-run
           </button>
         )}
         {run.agentId && (
@@ -229,7 +264,8 @@ export function ActiveRunPanel({
             state = run.status === "cancelled" ? "cancelled" : "failed";
           }
 
-          const output = record?.output?.trim() ?? "";
+          const output = record?.output.trim() ?? "";
+          const duration = stepDurationLabel(record);
 
           return (
             <li key={index} className="flex items-start gap-2 min-w-0">
@@ -262,6 +298,7 @@ export function ActiveRunPanel({
                   <span className="text-muted mr-1.5 not-italic font-sans">{index + 1}.</span>
                   {formatStepLabel(step)}
                 </span>
+                {duration && <span className="block text-xs text-muted tabular-nums">Took {duration}</span>}
                 {output && state !== "current" && (
                   <span className="block text-xs text-muted/80 whitespace-pre-wrap break-words line-clamp-3" title={output}>
                     {output}
@@ -272,6 +309,22 @@ export function ActiveRunPanel({
           );
         })}
       </ol>
+      {confirmingCancel && (
+        <ConfirmModal
+          title="Cancel workflow run?"
+          message={`This stops "${runTitle(run)}" mid-step and deletes the agent running it. Finished steps stay done; the rest will not run.`}
+          confirmLabel="Cancel run"
+          cancelLabel="Keep running"
+          variant="warning"
+          confirmIcon={OctagonX}
+          onConfirm={() => {
+            setConfirmingCancel(false);
+            onCancel(run);
+          }}
+          onClose={() => setConfirmingCancel(false)}
+          closeOnBackdrop
+        />
+      )}
     </div>
   );
 }

@@ -127,6 +127,62 @@ describe("WorkflowService", () => {
     expect(workflows.map(w => w.name)).toEqual(["alpha", "zeta"]);
   });
 
+  test("createWorkflow rejects names reserved by the dashboard routes", async () => {
+    const service = makeService(tempDir());
+    await expect(service.createWorkflow("new", sampleWorkflow)).rejects.toThrow("reserved");
+    await expect(service.createWorkflow("Marketplace", sampleWorkflow)).rejects.toThrow("reserved");
+  });
+
+  test("exportWorkflow round-trips through importWorkflow, carrying the name hint", async () => {
+    const service = makeService(tempDir());
+    await service.createWorkflow("bugHunter", {
+      ...sampleWorkflow,
+      steps: [{ command: "agent run", arguments: {}, remainder: "go", onError: "continue", retries: 2 }],
+      installedFrom: { registry: "tokenring-ai/community", id: "workflow/x", installedAt: "2026-01-01T00:00:00.000Z" },
+    });
+
+    const exported = await service.exportWorkflow("bugHunter");
+    expect(exported.fileName).toBe("bugHunter.yaml");
+    expect(exported.yaml.startsWith("# TokenRing workflow export")).toBe(true);
+    const parsed = YAML.parse(exported.yaml) as Record<string, unknown>;
+    expect(parsed.name).toBe("bugHunter");
+    expect(parsed.installedFrom).toBeUndefined();
+    expect(parsed.updatedAt).toBeUndefined();
+
+    // Name taken → refused; explicit new name → created with the same body.
+    await expect(service.importWorkflow(exported.yaml)).rejects.toThrow('Workflow "bugHunter" already exists');
+    const imported = await service.importWorkflow(exported.yaml, "bugHunter2");
+    expect(imported).toMatchObject({ name: "bugHunter2", displayName: "Bug Hunter", agentType: "leader" });
+    expect(imported.steps).toEqual([{ command: "agent run", arguments: {}, remainder: "go", onError: "continue", retries: 2 }]);
+    expect(imported.installedFrom).toBeUndefined();
+  });
+
+  test("importWorkflow validates the YAML and requires a name", async () => {
+    const service = makeService(tempDir());
+    await expect(service.importWorkflow("displayName: [unclosed", "x")).rejects.toThrow("Not valid YAML");
+    await expect(service.importWorkflow("- a\n- b\n", "x")).rejects.toThrow("must be a YAML mapping");
+    await expect(service.importWorkflow("displayName: X\nagentType: leader\n")).rejects.toThrow("no `name`");
+    await expect(service.importWorkflow("displayName: X\n", "x")).rejects.toThrow(/Invalid workflow file: agentType/);
+    await expect(service.importWorkflow("displayName: X\nagentType: leader\nsteps:\n  - retries: -1\n", "x")).rejects.toThrow("Invalid workflow file");
+    await expect(service.importWorkflow("displayName: X\nagentType: leader\n", "new")).rejects.toThrow("reserved");
+    expect(await service.listWorkflows()).toEqual([]);
+  });
+
+  test("duplicateWorkflow picks the next free copy name and marks the display name", async () => {
+    const service = makeService(tempDir());
+    await service.createWorkflow("bugHunter", sampleWorkflow);
+
+    const first = await service.duplicateWorkflow("bugHunter");
+    expect(first).toMatchObject({ name: "bugHunter-copy", displayName: "Bug Hunter (copy)", steps: sampleWorkflow.steps });
+    const second = await service.duplicateWorkflow("bugHunter");
+    expect(second.name).toBe("bugHunter-copy2");
+    const named = await service.duplicateWorkflow("bugHunter", "hunter3");
+    expect(named.name).toBe("hunter3");
+
+    await expect(service.duplicateWorkflow("bugHunter", "hunter3")).rejects.toThrow("already exists");
+    await expect(service.duplicateWorkflow("missing")).rejects.toThrow('Workflow "missing" not found');
+  });
+
   test("deleteWorkflow removes the file and reports whether it existed", async () => {
     const dir = tempDir();
     const service = makeService(dir);

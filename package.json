@@ -5,6 +5,7 @@
   "dependencies": {
     "@tokenring-ai/agent": "workspace:*",
     "@tokenring-ai/app": "workspace:*",
+    "@tokenring-ai/chat": "workspace:*",
     "@tokenring-ai/rpc": "workspace:*",
     "@tokenring-ai/utility": "workspace:*",
     "yaml": "^2.9.0",

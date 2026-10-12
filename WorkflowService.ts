@@ -9,6 +9,7 @@ import type { TokenRingService } from "@tokenring-ai/app/types";
 import { ConfigurationError } from "@tokenring-ai/app/types";
 import formatError from "@tokenring-ai/utility/error/formatError";
 import { YAML } from "bun";
+import type { z } from "zod";
 import { formatWorkflowStep, formatWorkflowStepLabel } from "./formatWorkflowStep.ts";
 import {
   type ParsedWorkflowConfig,
@@ -32,12 +33,31 @@ const MAX_STEP_OUTPUT_CHARS = 4000;
 
 const FILE_HEADER = "# TokenRing workflow definition. The file name is the workflow name.";
 
+const EXPORT_HEADER = "# TokenRing workflow export. Import it from the Workflows dashboard; `name` is the suggested workflow name.";
+
+/**
+ * Names that collide with Workflows dashboard routes (`/workflows/new`, `/workflows/marketplace`).
+ * Mirrors RESERVED_WORKFLOW_NAMES in frontend/lib/drafts.ts.
+ */
+const RESERVED_NAMES = new Set(["new", "marketplace"]);
+
 function assertValidName(name: string): void {
   if (!NAME_PATTERN.test(name)) {
     throw new Error(
       `Invalid workflow name "${name}". Names must start with a letter or number and may only contain letters, numbers, hyphens, and underscores.`,
     );
   }
+}
+
+function assertNotReserved(name: string): void {
+  if (RESERVED_NAMES.has(name.toLowerCase())) {
+    throw new Error(`"${name}" is reserved by the Workflows dashboard; pick another name.`);
+  }
+}
+
+/** Formats zod issues as one readable line each, e.g. `steps.1.command: Too small`. */
+function describeIssues(error: z.ZodError): string {
+  return error.issues.map(issue => `${issue.path.length > 0 ? issue.path.join(".") : "(root)"}: ${issue.message}`).join("; ");
 }
 
 async function pathExists(target: string): Promise<boolean> {
@@ -49,6 +69,18 @@ async function pathExists(target: string): Promise<boolean> {
 
 function truncateOutput(message: string): string {
   return message.length > MAX_STEP_OUTPUT_CHARS ? `${message.slice(0, MAX_STEP_OUTPUT_CHARS)}…` : message;
+}
+
+/**
+ * Reads the signal's current abort state.
+ *
+ * Deliberately indirect: a bare `signal.aborted` read is narrowed to `false` by
+ * an earlier `if (signal.aborted)` check for the rest of the block, even though
+ * the awaits in between can abort the signal. Going through a function keeps
+ * every check a live runtime read.
+ */
+function isAborted(signal: AbortSignal): boolean {
+  return signal.aborted;
 }
 
 /**
@@ -166,10 +198,71 @@ export default class WorkflowService implements TokenRingService {
 
   async createWorkflow(workflowName: string, workflow: WorkflowItemInput): Promise<Workflow> {
     const filePath = this.resolveWorkflowPath(workflowName);
+    assertNotReserved(workflowName);
     if (await pathExists(filePath)) {
       throw new Error(`Workflow "${workflowName}" already exists`);
     }
     return this.writeWorkflowFile(filePath, workflowName, workflow);
+  }
+
+  /**
+   * Serializes a workflow for download: the file body plus a `name` hint the importer uses as the
+   * default workflow name. `installedFrom` is dropped — an exported copy is no longer tied to the
+   * marketplace item it came from.
+   */
+  async exportWorkflow(workflowName: string): Promise<{ fileName: string; yaml: string }> {
+    const workflow = await this.getWorkflow(workflowName);
+    if (!workflow) throw new Error(`Workflow "${workflowName}" not found`);
+    const { name, updatedAt: _updatedAt, installedFrom: _installedFrom, ...item } = workflow;
+    const yaml = YAML.stringify({ name, ...item }, null, 2).trimEnd();
+    return { fileName: `${name}${EXTENSION}`, yaml: `${EXPORT_HEADER}\n${yaml}\n` };
+  }
+
+  /**
+   * Creates a workflow from exported (or hand-written) YAML. The name is `name` when given,
+   * otherwise the file's `name` key. Validates the body against the workflow schema and refuses
+   * to overwrite an existing workflow.
+   */
+  async importWorkflow(yaml: string, name?: string): Promise<Workflow> {
+    let parsed: unknown;
+    try {
+      parsed = YAML.parse(yaml);
+    } catch (error) {
+      throw new Error(`Not valid YAML: ${formatError(error)}`);
+    }
+    if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
+      throw new Error("A workflow file must be a YAML mapping (displayName, agentType, steps, …).");
+    }
+
+    const fileName = (parsed as { name?: unknown }).name;
+    const workflowName = (name ?? (typeof fileName === "string" ? fileName : "")).trim();
+    if (!workflowName) throw new Error("The file has no `name`; choose a name for the imported workflow.");
+
+    const result = WorkflowItemSchema.safeParse(parsed);
+    if (!result.success) throw new Error(`Invalid workflow file: ${describeIssues(result.error)}`);
+    const { installedFrom: _installedFrom, ...item } = result.data;
+    return this.createWorkflow(workflowName, item);
+  }
+
+  /**
+   * Copies a workflow under a new name: `newName`, or the first free `<name>-copy`, `<name>-copy2`, …
+   * (the same scheme as the editor's Clone).
+   * The copy's display name gains a "(copy)" suffix and it loses any marketplace origin.
+   */
+  async duplicateWorkflow(workflowName: string, newName?: string): Promise<Workflow> {
+    const source = await this.getWorkflow(workflowName);
+    if (!source) throw new Error(`Workflow "${workflowName}" not found`);
+
+    let targetName = newName?.trim();
+    if (!targetName) {
+      targetName = `${workflowName}-copy`;
+      for (let n = 2; await pathExists(this.resolveWorkflowPath(targetName)); n++) {
+        targetName = `${workflowName}-copy${n}`;
+      }
+    }
+
+    const { name: _name, updatedAt: _updatedAt, installedFrom: _installedFrom, ...item } = source;
+    return this.createWorkflow(targetName, { ...item, displayName: `${source.displayName} (copy)` });
   }
 
   async updateWorkflow(workflowName: string, workflow: WorkflowItemInput): Promise<Workflow> {
@@ -308,7 +401,7 @@ export default class WorkflowService implements TokenRingService {
       await agent.waitForState(AgentEventState, state => state.idle, signal);
 
       for (const [index, step] of steps.entries()) {
-        if (signal.aborted) {
+        if (isAborted(signal)) {
           this.finishRun(runId, this.abortRunStatus(signal), this.abortRunMessage(signal, timeoutMs));
           return;
         }
@@ -318,7 +411,7 @@ export default class WorkflowService implements TokenRingService {
         const options = stepExecutionOptions(step);
         let result = await this.runStep(agent, step, from, signal);
         let attempts = 1;
-        while (result.status === "error" && attempts <= options.retries && !signal.aborted) {
+        while (result.status === "error" && attempts <= options.retries && !isAborted(signal)) {
           result = await this.runStep(agent, step, from, signal);
           attempts += 1;
         }
@@ -331,7 +424,7 @@ export default class WorkflowService implements TokenRingService {
           continue;
         }
 
-        if (result.status === "cancelled" || signal.aborted) {
+        if (result.status === "cancelled" || isAborted(signal)) {
           this.updateRun(runId, state => state.endStep(runId, index, "cancelled", truncateOutput(result.message)));
           this.finishRun(runId, "cancelled", result.message);
           return;
@@ -349,7 +442,7 @@ export default class WorkflowService implements TokenRingService {
         return;
       }
 
-      if (signal.aborted) {
+      if (isAborted(signal)) {
         this.finishRun(runId, this.abortRunStatus(signal), this.abortRunMessage(signal, timeoutMs));
         return;
       }

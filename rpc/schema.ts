@@ -48,6 +48,38 @@ export default {
         workflow: WorkflowSchema,
       }),
     },
+    duplicateWorkflow: {
+      type: "mutation",
+      input: z.object({
+        name: z.string(),
+        /** Defaults to the first free `<name>-copy`, `<name>-copy2`, …. */
+        newName: z.string().optional(),
+      }),
+      result: z.object({
+        workflow: WorkflowSchema,
+      }),
+    },
+    exportWorkflow: {
+      type: "query",
+      input: z.object({
+        name: z.string(),
+      }),
+      result: z.object({
+        fileName: z.string(),
+        yaml: z.string(),
+      }),
+    },
+    importWorkflow: {
+      type: "mutation",
+      input: z.object({
+        yaml: z.string(),
+        /** Overrides the `name` key in the file. */
+        name: z.string().optional(),
+      }),
+      result: z.object({
+        workflow: WorkflowSchema,
+      }),
+    },
     deleteWorkflow: {
       type: "mutation",
       input: z.object({

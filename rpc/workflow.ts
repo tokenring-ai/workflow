@@ -28,6 +28,20 @@ export default createRPCEndpoint(WorkflowRpcSchema, {
     return { workflow };
   },
 
+  async duplicateWorkflow(args, app: TokenRingApp) {
+    const workflow = await app.requireService(WorkflowService).duplicateWorkflow(args.name, args.newName);
+    return { workflow };
+  },
+
+  exportWorkflow(args, app: TokenRingApp) {
+    return app.requireService(WorkflowService).exportWorkflow(args.name);
+  },
+
+  async importWorkflow(args, app: TokenRingApp) {
+    const workflow = await app.requireService(WorkflowService).importWorkflow(args.yaml, args.name);
+    return { workflow };
+  },
+
   async deleteWorkflow(args, app: TokenRingApp) {
     const success = await app.requireService(WorkflowService).deleteWorkflow(args.name);
     return { success };
