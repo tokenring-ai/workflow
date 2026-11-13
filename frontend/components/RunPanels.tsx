@@ -1,7 +1,6 @@
 import BusySpinner from "@tokenring-ai/one-frontend/components/ui/BusySpinner.tsx";
 import ConfirmModal from "@tokenring-ai/one-frontend/components/ui/ConfirmModal.tsx";
 import HistoryRunRow, { type HistoryRunStatus } from "@tokenring-ai/one-frontend/components/ui/HistoryRunRow.tsx";
-import LaunchButton from "@tokenring-ai/one-frontend/components/ui/LaunchButton.tsx";
 import StatusBadge, { type StatusBadgeDefinition } from "@tokenring-ai/one-frontend/components/ui/StatusBadge.tsx";
 import { formatStepLabel } from "@tokenring-ai/one-frontend/features/workflows/commandStep.ts";
 import { runOrConfirm } from "@tokenring-ai/one-frontend/lib/uiPreferences.ts";
@@ -62,7 +61,7 @@ export function openRunLabel(run: WorkflowRun): string {
 export function RunningCountBadge({ count, live = false, className }: { count: number; live?: boolean; className?: string }) {
   return (
     <span
-      className={cn("shrink-0 rounded-full px-1.5 py-0.5 text-xs font-medium bg-amber-500/10 text-amber-600 dark:text-amber-500", className)}
+      className={cn("shrink-0 rounded-full px-1.5 py-0.5 text-xs font-medium bg-accent-tint text-accent", className)}
       aria-live={live ? "polite" : undefined}
     >
       {count} running
@@ -70,13 +69,13 @@ export function RunningCountBadge({ count, live = false, className }: { count: n
   );
 }
 
-/** Card for one in-flight run, used on the installed overview. */
+/** Card for one in-flight run, used on the Runs page. */
 export function RunningWorkflowCard({ run, onOpen }: { run: WorkflowRun; onOpen: () => void }) {
   return (
     <button
       type="button"
       onClick={onOpen}
-      className="flex items-center gap-2.5 min-w-0 px-3 py-2 rounded-lg border text-left transition-all cursor-pointer focus-ring bg-amber-500/5 border-amber-500/30 hover:bg-hover hover:border-amber-500/60"
+      className="flex items-center gap-2.5 min-w-0 px-3 py-2 rounded-lg border text-left transition-all cursor-pointer focus-ring bg-accent-tint border-accent-line hover:bg-hover hover:border-accent"
       aria-label={openRunLabel(run)}
     >
       <span className="shrink-0 inline-flex" aria-hidden="true">
@@ -85,43 +84,11 @@ export function RunningWorkflowCard({ run, onOpen }: { run: WorkflowRun; onOpen:
       <span className="min-w-0 flex-1">
         <span className="flex items-center gap-1.5 min-w-0">
           <span className="min-w-0 flex-1 truncate text-sm font-medium text-primary">{runTitle(run)}</span>
-          <span className="shrink-0 text-xs font-medium text-amber-600 dark:text-amber-500">{run.status === "starting" ? "Starting" : "Running"}</span>
+          <span className="shrink-0 text-xs font-medium text-accent">{run.status === "starting" ? "Starting" : "Running"}</span>
         </span>
         <span className="block truncate text-xs text-muted">{runStepSummary(run)}</span>
       </span>
     </button>
-  );
-}
-
-/** Card for one installed workflow, used on the overview launch grid. */
-export function WorkflowCard({
-  workflow,
-  runningCount,
-  launching,
-  onView,
-  onLaunch,
-}: {
-  workflow: { name: string; displayName: string; category: string; description: string };
-  runningCount: number;
-  launching: boolean;
-  onView: () => void;
-  onLaunch: () => void;
-}) {
-  const name = workflow.displayName || workflow.name;
-  return (
-    <div className="flex flex-col gap-2 min-w-0 bg-secondary border border-primary rounded-lg px-3 py-2.5 hover:border-cyan-500/40 transition-colors">
-      <button type="button" onClick={onView} className="min-w-0 text-left cursor-pointer focus-ring rounded" aria-label={`View ${name}`}>
-        <span className="flex items-center gap-1.5 min-w-0">
-          <span className="min-w-0 flex-1 truncate text-sm font-medium text-primary">{name}</span>
-        </span>
-        <span className="block truncate text-xs text-muted">{workflow.category}</span>
-      </button>
-      <p className="text-xs text-secondary leading-relaxed line-clamp-2 min-w-0">{workflow.description || "No description provided."}</p>
-      <div className="flex items-center justify-end gap-2 mt-auto">
-        {runningCount > 0 ? <span className="mr-auto min-w-0 truncate text-xs text-muted">{runningCount} running</span> : null}
-        <LaunchButton loading={launching} onClick={onLaunch} aria-label={`Launch ${name}`} title={`Launch ${name}`} className="shrink-0" />
-      </div>
-    </div>
   );
 }
 
@@ -134,22 +101,22 @@ const RUN_STATUS_BADGES: Record<WorkflowRunStatus, StatusBadgeDefinition> = {
   starting: {
     label: "Starting",
     icon: <Loader2 className="w-3 h-3 animate-spin" />,
-    colorClass: "text-amber-600 dark:text-amber-400",
+    colorClass: "text-accent",
   },
   running: {
     label: "Running",
     icon: <Loader2 className="w-3 h-3 animate-spin" />,
-    colorClass: "text-amber-600 dark:text-amber-400",
+    colorClass: "text-accent",
   },
   completed: {
     label: "Completed",
     icon: <CheckCircle2 className="w-3 h-3" />,
-    colorClass: "text-emerald-600 dark:text-emerald-400",
+    colorClass: "text-success",
   },
   failed: {
     label: "Failed",
     icon: <XCircle className="w-3 h-3" />,
-    colorClass: "text-red-600 dark:text-red-400",
+    colorClass: "text-error",
   },
   cancelled: {
     label: "Cancelled",
@@ -199,11 +166,11 @@ export function ActiveRunPanel({
       aria-label="Workflow run progress"
       className={`border rounded-xl overflow-hidden ${
         active
-          ? "border-amber-500/40 bg-amber-500/5"
+          ? "border-accent-line bg-accent-tint"
           : run.status === "completed"
-            ? "border-emerald-500/30 bg-emerald-500/5"
+            ? "border-success bg-success/10"
             : run.status === "failed"
-              ? "border-red-500/30 bg-red-500/5"
+              ? "border-error bg-error/10"
               : "border-primary bg-secondary/40"
       }`}
     >
@@ -221,7 +188,7 @@ export function ActiveRunPanel({
             type="button"
             onClick={requestCancel}
             disabled={cancelling}
-            className="flex items-center gap-1 px-2 py-1 text-xs font-medium text-muted hover:text-red-500 hover:bg-red-500/10 rounded-lg transition-colors cursor-pointer focus-ring disabled:opacity-50 shrink-0"
+            className="flex items-center gap-1 px-2 py-1 text-xs font-medium text-muted hover:text-error hover:bg-(--status-danger-bg) rounded-lg transition-colors cursor-pointer focus-ring disabled:opacity-50 shrink-0"
           >
             {cancelling ? <Loader2 className="w-3 h-3 animate-spin" /> : <OctagonX className="w-3 h-3" />} Cancel
           </button>
@@ -271,11 +238,11 @@ export function ActiveRunPanel({
             <li key={index} className="flex items-start gap-2 min-w-0">
               <span className="mt-0.5 shrink-0">
                 {state === "done" ? (
-                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
+                  <CheckCircle2 className="w-3.5 h-3.5 text-success" />
                 ) : state === "current" ? (
-                  <Loader2 className="w-3.5 h-3.5 text-amber-500 animate-spin" />
+                  <Loader2 className="w-3.5 h-3.5 text-accent animate-spin" />
                 ) : state === "failed" ? (
-                  <XCircle className="w-3.5 h-3.5 text-red-500" />
+                  <XCircle className="w-3.5 h-3.5 text-error" />
                 ) : state === "cancelled" || state === "skipped" ? (
                   <X className="w-3.5 h-3.5 text-muted" />
                 ) : (
@@ -285,13 +252,7 @@ export function ActiveRunPanel({
               <span className="flex-1 min-w-0">
                 <span
                   className={`block text-xs font-mono truncate ${
-                    state === "current"
-                      ? "text-primary font-medium"
-                      : state === "done"
-                        ? "text-muted"
-                        : state === "failed"
-                          ? "text-red-600 dark:text-red-400"
-                          : "text-muted/70"
+                    state === "current" ? "text-primary font-medium" : state === "done" ? "text-muted" : state === "failed" ? "text-error" : "text-muted/70"
                   }`}
                   title={formatStepLabel(step)}
                 >

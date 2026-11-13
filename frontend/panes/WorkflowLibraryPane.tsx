@@ -1,24 +1,25 @@
+import { useRouteParamsFor } from "@tokenring-ai/one-frontend/apps/panelHooks.ts";
 import { useWorkflowRuns, useWorkflows } from "@tokenring-ai/one-frontend/rpc.ts";
 import type { Workflow, WorkflowRun } from "@tokenring-ai/workflow/schema";
 import { useMemo, useState } from "react";
-import { useLocation, useParams } from "react-router-dom";
 import ImportWorkflowDialog from "../components/ImportWorkflowDialog.tsx";
-import { isRunActive, isRunFinished, sortRunsNewestFirst } from "../components/RunPanels.tsx";
+import { isRunActive, sortRunsNewestFirst } from "../components/RunPanels.tsx";
 import { WorkflowSidebar } from "../components/WorkflowSidebar.tsx";
+import { WORKFLOW_CREATE_VIEW_ID, WORKFLOW_EDITOR_VIEW_ID } from "../ids.ts";
 import { isSameDraft, toDraft } from "../lib/drafts.ts";
-import { isWorkflowMarketplacePath, NEW_WORKFLOW_PATH } from "../lib/paths.ts";
-import { useWorkflowDrafts, useWorkflowLaunch, useWorkflowsNavigation } from "../lib/workflowsShared.tsx";
+import { useWorkflowLaunch, useWorkflowLayoutNavigation } from "../lib/useWorkflowLayoutNavigation.ts";
+import { useWorkflowDrafts } from "../lib/workflowState.tsx";
 import { duplicateWorkflow, useWorkflowImport } from "../lib/workflowTransfer.ts";
 
-/** Navigator for the Workflows dashboard: running and recent runs, then installed workflows by category. */
-export default function WorkflowLibraryView() {
-  const { pathname } = useLocation();
-  const { workflowName: routeName } = useParams<{ workflowName?: string }>();
+/** Navigator for the Workflows app: installed workflows by category (runs are on the Runs page). */
+export default function WorkflowLibraryPane() {
+  const editorParams = useRouteParamsFor(WORKFLOW_EDITOR_VIEW_ID);
+  const creating = useRouteParamsFor(WORKFLOW_CREATE_VIEW_ID) !== null;
   const workflows = useWorkflows();
   const workflowRuns = useWorkflowRuns();
   const { drafts } = useWorkflowDrafts();
   const { launch, launching } = useWorkflowLaunch();
-  const { openOverview, openWorkflow, openCreate, openMarketplace, openRun } = useWorkflowsNavigation();
+  const { openOverview, openWorkflow, openCreate, openMarketplace } = useWorkflowLayoutNavigation();
 
   const [duplicating, setDuplicating] = useState<string | null>(null);
   const workflowImport = useWorkflowImport(name => {
@@ -42,7 +43,6 @@ export default function WorkflowLibraryView() {
   const workflowList = (workflows.data ?? []) as Workflow[];
   const allRuns = useMemo(() => sortRunsNewestFirst((workflowRuns.data?.runs ?? []) as WorkflowRun[]), [workflowRuns.data]);
   const activeRuns = useMemo(() => allRuns.filter(isRunActive), [allRuns]);
-  const recentFinishedRuns = useMemo(() => allRuns.filter(isRunFinished).slice(0, 8), [allRuns]);
 
   const dirtyNames = useMemo(() => {
     const names = new Set<string>();
@@ -53,8 +53,7 @@ export default function WorkflowLibraryView() {
     return names;
   }, [drafts, workflowList]);
 
-  const creating = pathname === NEW_WORKFLOW_PATH;
-  const selectedName = routeName && routeName !== "new" && !isWorkflowMarketplacePath(pathname) ? routeName : null;
+  const selectedName = editorParams?.name ?? null;
 
   return (
     <>
@@ -67,13 +66,10 @@ export default function WorkflowLibraryView() {
         creating={creating}
         dirtyNames={dirtyNames}
         activeRuns={activeRuns}
-        recentFinishedRuns={recentFinishedRuns}
         launchingName={launching}
         onSelect={name => openWorkflow(name)}
         onNew={openCreate}
         onRun={name => void launch(name)}
-        onWatchRun={openRun}
-        onSelectRunWorkflow={name => openWorkflow(name)}
         onGoOverview={openOverview}
         onBrowseMarketplace={openMarketplace}
         onImportFile={file => void workflowImport.chooseFile(file)}

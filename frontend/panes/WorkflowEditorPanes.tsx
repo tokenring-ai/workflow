@@ -1,14 +1,15 @@
+import { usePanelBadge, usePanelTitle } from "@tokenring-ai/one-frontend/apps/panelHooks.ts";
 import ConfirmModal from "@tokenring-ai/one-frontend/components/ui/ConfirmModal.tsx";
 import EmptyState from "@tokenring-ai/one-frontend/components/ui/EmptyState.tsx";
 import ErrorState from "@tokenring-ai/one-frontend/components/ui/ErrorState.tsx";
 import LoadingState from "@tokenring-ai/one-frontend/components/ui/LoadingState.tsx";
 import { toastManager } from "@tokenring-ai/one-frontend/components/ui/toast.tsx";
 import ViewShell from "@tokenring-ai/one-frontend/components/ui/ViewShell.tsx";
-import { setPanelBadge } from "@tokenring-ai/one-frontend/dock/panelBadges.ts";
-import type { ViewProps } from "@tokenring-ai/one-frontend/dock/types.ts";
 import { useEntityDelete } from "@tokenring-ai/one-frontend/hooks/useEntityDelete.ts";
 import { useKeyboardShortcuts } from "@tokenring-ai/one-frontend/hooks/useKeyboardShortcuts.ts";
 import { useRemoteChangeDetection } from "@tokenring-ai/one-frontend/hooks/useRemoteChangeDetection.ts";
+import type { ViewProps } from "@tokenring-ai/one-frontend/layout/define.ts";
+import { usePanel } from "@tokenring-ai/one-frontend/layout/hooks.ts";
 import { toastOnReject } from "@tokenring-ai/one-frontend/lib/toastOnReject.ts";
 import { runOrConfirm } from "@tokenring-ai/one-frontend/lib/uiPreferences.ts";
 import { useAgentTypes, useAvailableCommands, useWorkflowRuns, useWorkflows, workflowRPCClient } from "@tokenring-ai/one-frontend/rpc.ts";
@@ -16,18 +17,11 @@ import formatError from "@tokenring-ai/utility/error/formatError";
 import type { Workflow, WorkflowRun } from "@tokenring-ai/workflow/schema";
 import { GitBranch, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import type { WorkflowEditorParams } from "../app.tsx";
 import { isRunActive, sortRunsNewestFirst } from "../components/RunPanels.tsx";
 import WorkflowEditor from "../components/WorkflowEditor.tsx";
 import { cloneDraft, emptyDraft, isSameDraft, isValidWorkflowName, normalizeDraft, toDraft, uniqueCloneName, workflowTitle } from "../lib/drafts.ts";
-import {
-  NEW_DRAFT_KEY,
-  setNewWorkflowName,
-  useNewWorkflowName,
-  useWorkflowDrafts,
-  useWorkflowLaunch,
-  useWorkflowsNavigation,
-} from "../lib/workflowsShared.tsx";
+import { useWorkflowLaunch, useWorkflowLayoutNavigation } from "../lib/useWorkflowLayoutNavigation.ts";
+import { NEW_DRAFT_KEY, setNewWorkflowName, useNewWorkflowName, useWorkflowDrafts } from "../lib/workflowState.tsx";
 import { downloadWorkflowYaml } from "../lib/workflowTransfer.ts";
 
 function useEditorData() {
@@ -51,12 +45,13 @@ function refreshWorkflowsBestEffort(workflows: ReturnType<typeof useWorkflows>) 
 }
 
 /** View or edit one installed workflow, with its live run and run history. */
-export function WorkflowEditorView({ params, panel }: ViewProps<WorkflowEditorParams>) {
-  const name = params.name;
+export function WorkflowEditorPane({ params }: ViewProps) {
+  const name = params.name ?? "";
+  const panel = usePanel();
   const { workflows, workflowList, agentTypes, commandList, categories, allRuns } = useEditorData();
   const { drafts, setDraft, clearDraft, clearDraftIfUnchanged } = useWorkflowDrafts();
   const { launch, launching } = useWorkflowLaunch();
-  const { openOverview, openCreate, openAgentChat } = useWorkflowsNavigation();
+  const { openOverview, openCreate, openAgentChat } = useWorkflowLayoutNavigation();
   const [saving, setSaving] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
   const [cancellingRunId, setCancellingRunId] = useState<string | null>(null);
@@ -68,15 +63,10 @@ export function WorkflowEditorView({ params, panel }: ViewProps<WorkflowEditorPa
   const workflowRuns = useMemo(() => allRuns.filter(run => run.workflowName === name), [allRuns, name]);
   const activeRun = useMemo(() => workflowRuns.find(isRunActive) ?? null, [workflowRuns]);
 
-  useEffect(() => {
-    panel.setTitle(selected ? workflowTitle(selected) : name);
-  }, [name, panel, selected]);
+  usePanelTitle(selected ? workflowTitle(selected) : name);
 
   // Unsaved edits show on the tab; saving or discarding clears the badge, as does closing the panel.
-  useEffect(() => {
-    setPanelBadge(panel.panelId, isDirty ? { title: "Unsaved changes", tone: "warning" } : null);
-  }, [isDirty, panel.panelId]);
-  useEffect(() => () => setPanelBadge(panel.panelId, null), [panel.panelId]);
+  usePanelBadge(isDirty ? { tone: "warning", label: "Unsaved changes" } : null);
 
   // When an agent (or CLI) edits the open workflow on disk, reload it if the user has no unsaved
   // edits; with unsaved edits the poller stays quiet so nothing is clobbered.
@@ -234,19 +224,16 @@ export function WorkflowEditorView({ params, panel }: ViewProps<WorkflowEditorPa
 }
 
 /** Create a workflow. Cloning another workflow seeds this form. */
-export function WorkflowCreateView({ panel }: ViewProps) {
+export function WorkflowCreatePane() {
+  const panel = usePanel();
   const { workflows, workflowList, agentTypes, commandList, categories } = useEditorData();
   const { drafts, setDraft, clearDraft } = useWorkflowDrafts();
-  const { openOverview, openWorkflow } = useWorkflowsNavigation();
+  const { openOverview, openWorkflow } = useWorkflowLayoutNavigation();
   const newName = useNewWorkflowName();
   const [saving, setSaving] = useState(false);
   const blank = useMemo(() => emptyDraft(), []);
   const draft = drafts[NEW_DRAFT_KEY] ?? blank;
   const isDirty = !isSameDraft(draft, blank);
-
-  useEffect(() => {
-    panel.setTitle("New workflow");
-  }, [panel]);
 
   const finish = useCallback(() => {
     clearDraft(NEW_DRAFT_KEY);

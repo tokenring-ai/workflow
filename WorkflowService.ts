@@ -265,10 +265,21 @@ export default class WorkflowService implements TokenRingService {
     return this.createWorkflow(targetName, { ...item, displayName: `${source.displayName} (copy)` });
   }
 
+  /**
+   * Overwrites an existing workflow file. When the payload omits `installedFrom`, the file's
+   * marketplace provenance is kept. A payload that sets it — a marketplace update, or an editor
+   * draft that already has it — replaces the stamp.
+   */
   async updateWorkflow(workflowName: string, workflow: WorkflowItemInput): Promise<Workflow> {
     const filePath = this.resolveWorkflowPath(workflowName);
     if (!(await pathExists(filePath))) {
       throw new Error(`Workflow "${workflowName}" not found`);
+    }
+    if (workflow.installedFrom === undefined) {
+      const existing = await this.getWorkflow(workflowName);
+      if (existing?.installedFrom) {
+        return this.writeWorkflowFile(filePath, workflowName, { ...workflow, installedFrom: existing.installedFrom });
+      }
     }
     return this.writeWorkflowFile(filePath, workflowName, workflow);
   }

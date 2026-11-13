@@ -1,15 +1,12 @@
 import NavigationSidebarHeader from "@tokenring-ai/one-frontend/components/layout/NavigationSidebarHeader.tsx";
 import SidebarCategoryAccordion from "@tokenring-ai/one-frontend/components/layout/SidebarCategoryAccordion.tsx";
-import BusySpinner from "@tokenring-ai/one-frontend/components/ui/BusySpinner.tsx";
 import ErrorState from "@tokenring-ai/one-frontend/components/ui/ErrorState.tsx";
 import LaunchButton from "@tokenring-ai/one-frontend/components/ui/LaunchButton.tsx";
 import ListItemWithActions from "@tokenring-ai/one-frontend/components/ui/ListItemWithActions.tsx";
-import { formatRelativeTime } from "@tokenring-ai/utility/date/formatRelativeTime";
 import type { Workflow, WorkflowRun } from "@tokenring-ai/workflow/schema";
-import { CheckCircle2, Copy, GitBranch, History, LayoutDashboard, Loader2, Plus, Store, Upload, X, XCircle } from "lucide-react";
+import { Copy, GitBranch, History, Loader2, Plus, Store, Upload } from "lucide-react";
 import { useRef } from "react";
 import { DEFAULT_CATEGORY, matchesWorkflowFilter, workflowTitle } from "../lib/drafts.ts";
-import { openRunLabel, RunningCountBadge, runStepSummary, runTitle } from "./RunPanels.tsx";
 
 export function WorkflowSidebar({
   workflows,
@@ -20,13 +17,10 @@ export function WorkflowSidebar({
   creating,
   dirtyNames,
   activeRuns,
-  recentFinishedRuns,
   launchingName,
   onSelect,
   onNew,
   onRun,
-  onWatchRun,
-  onSelectRunWorkflow,
   onGoOverview,
   onBrowseMarketplace,
   onImportFile,
@@ -41,15 +35,11 @@ export function WorkflowSidebar({
   creating: boolean;
   dirtyNames: Set<string>;
   activeRuns: WorkflowRun[];
-  recentFinishedRuns: WorkflowRun[];
   launchingName: string | null;
   onSelect: (name: string) => void;
   onNew: () => void;
   onRun: (name: string) => void;
-  /** Focus a running run inside the app (dock + editor). */
-  onWatchRun: (run: WorkflowRun) => void;
-
-  onSelectRunWorkflow: (workflowName: string) => void;
+  /** The Runs page (running and recent runs). */
   onGoOverview: () => void;
   onBrowseMarketplace: () => void;
   /** A workflow YAML file the user picked to import. */
@@ -60,21 +50,21 @@ export function WorkflowSidebar({
   const importInputRef = useRef<HTMLInputElement>(null);
   return (
     <div className="h-full flex flex-col bg-secondary border-r border-primary">
+      {/* No title: the panel's tab already says "Workflows". */}
       <NavigationSidebarHeader
-        title="Workflows"
         actions={[
           {
-            key: "overview",
-            icon: <LayoutDashboard className="w-3.5 h-3.5" />,
-            label: "Workflows overview",
-            title: "Workflows overview",
+            key: "runs",
+            icon: <History className="w-3.5 h-3.5" />,
+            label: activeRuns.length > 0 ? `Runs (${activeRuns.length} running)` : "Runs",
+            title: activeRuns.length > 0 ? `Runs: ${activeRuns.length} running` : "Running and recent runs",
             onClick: onGoOverview,
           },
           {
             key: "marketplace",
             icon: <Store className="w-3.5 h-3.5" />,
-            label: "Browse the workflow marketplace",
-            title: "Browse the workflow marketplace",
+            label: "Browse workflows in the marketplace",
+            title: "Browse workflows in the marketplace",
             onClick: onBrowseMarketplace,
           },
           {
@@ -110,70 +100,6 @@ export function WorkflowSidebar({
       />
 
       <div className="flex-1 overflow-y-auto">
-        <div className="border-b border-primary/50">
-          <div className="flex items-center justify-between gap-2 px-3 pt-2.5 pb-1">
-            <span className="text-xs font-bold text-amber-600 dark:text-amber-500/90 uppercase tracking-widest">Running</span>
-            <RunningCountBadge count={activeRuns.length} live />
-          </div>
-          {activeRuns.length === 0 ? (
-            <div className="px-3 py-4 text-center text-muted text-xs italic">No active workflows</div>
-          ) : (
-            activeRuns.map(run => (
-              <button
-                type="button"
-                key={run.id}
-                onClick={() => (run.agentId ? onWatchRun(run) : onSelectRunWorkflow(run.workflowName))}
-                className="w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-hover transition-colors cursor-pointer focus-ring"
-                aria-label={openRunLabel(run)}
-                title={runStepSummary(run)}
-              >
-                <BusySpinner />
-                <div className="min-w-0 flex-1">
-                  <div className="text-xs font-medium text-primary truncate">{runTitle(run)}</div>
-                  <div className="text-xs text-muted truncate">{runStepSummary(run)}</div>
-                </div>
-              </button>
-            ))
-          )}
-        </div>
-
-        {recentFinishedRuns.length > 0 && (
-          <div className="border-b border-primary/50">
-            <span className="flex items-center gap-1 px-3 pt-2.5 pb-1 text-xs font-bold text-muted uppercase tracking-widest">
-              <History className="w-3 h-3" /> Recent runs
-            </span>
-            {recentFinishedRuns.map(run => {
-              const when = run.finishedAt ?? run.startedAt;
-              return (
-                <button
-                  type="button"
-                  key={run.id}
-                  onClick={() => onSelectRunWorkflow(run.workflowName)}
-                  className="w-full flex items-start gap-2 px-3 py-2 text-left hover:bg-hover transition-colors cursor-pointer focus-ring"
-                  aria-label={`View runs for ${run.displayName || run.workflowName}`}
-                  title={run.message || undefined}
-                >
-                  <div className="mt-0.5 shrink-0">
-                    {run.status === "completed" ? (
-                      <CheckCircle2 className="w-3 h-3 text-emerald-500" />
-                    ) : run.status === "failed" ? (
-                      <XCircle className="w-3 h-3 text-red-500" />
-                    ) : (
-                      <X className="w-3 h-3 text-muted" />
-                    )}
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <div className="text-xs font-medium text-primary truncate">{run.displayName || run.workflowName}</div>
-                    <div className="text-xs text-muted truncate">
-                      {run.status} · {formatRelativeTime(when)}
-                    </div>
-                  </div>
-                </button>
-              );
-            })}
-          </div>
-        )}
-
         {creating && (
           <div className="flex items-center gap-1.5 px-2 py-2 bg-accent-muted text-accent border-b border-primary/50">
             <Plus className="w-3.5 h-3.5 shrink-0" />
@@ -249,7 +175,7 @@ export function WorkflowSidebar({
                 <span className="flex items-center gap-1.5 py-0.5 min-w-0">
                   <GitBranch className="w-3 h-3 shrink-0 opacity-70" />
                   <span className="flex-1 min-w-0 truncate text-xs">{workflow.displayName || workflow.name}</span>
-                  {hasActiveRun && <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse shrink-0" title="Running" />}
+                  {hasActiveRun && <span className="w-1.5 h-1.5 rounded-full bg-accent animate-pulse shrink-0" title="Running" />}
                   {dirtyNames.has(workflow.name) && <span className="w-1.5 h-1.5 rounded-full bg-accent shrink-0" title="Unsaved changes" />}
                 </span>
               </ListItemWithActions>

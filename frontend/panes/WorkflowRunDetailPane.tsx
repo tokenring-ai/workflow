@@ -1,27 +1,30 @@
+import { useAttachedAgentChat } from "@tokenring-ai/one-frontend/apps/chat/useAttachedAgentChat.ts";
+import { usePanelTitle } from "@tokenring-ai/one-frontend/apps/panelHooks.ts";
 import type { ExtraChatAttachment } from "@tokenring-ai/one-frontend/components/chat/ChatFooter.tsx";
 import EmptyState from "@tokenring-ai/one-frontend/components/ui/EmptyState.tsx";
 import LoadingState from "@tokenring-ai/one-frontend/components/ui/LoadingState.tsx";
 import { toastManager } from "@tokenring-ai/one-frontend/components/ui/toast.tsx";
 import ViewHeader from "@tokenring-ai/one-frontend/components/ui/ViewHeader.tsx";
 import ViewShell from "@tokenring-ai/one-frontend/components/ui/ViewShell.tsx";
-import { setChatExtras } from "@tokenring-ai/one-frontend/dock/chatExtras.ts";
-import type { ViewProps } from "@tokenring-ai/one-frontend/dock/types.ts";
 import { formatStepLabel, type WorkflowStep } from "@tokenring-ai/one-frontend/features/workflows/commandStep.ts";
+import type { ViewProps } from "@tokenring-ai/one-frontend/layout/define.ts";
+import { usePanel } from "@tokenring-ai/one-frontend/layout/hooks.ts";
 import { useWorkflowRuns, workflowRPCClient } from "@tokenring-ai/one-frontend/rpc.ts";
+import { Button } from "@tokenring-ai/one-frontend/ui";
 import { formatRelativeTime } from "@tokenring-ai/utility/date/formatRelativeTime";
 import formatError from "@tokenring-ai/utility/error/formatError";
 import type { WorkflowRun } from "@tokenring-ai/workflow/schema";
 import { Activity, GitBranch, MessageSquare, X } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
-import type { WorkflowRunDetailParams } from "../app.tsx";
+import { useCallback, useMemo, useState } from "react";
 import { ActiveRunPanel, isRunActive, RunStatusBadge, runTitle } from "../components/RunPanels.tsx";
-import { useWorkflowLaunch, useWorkflowsNavigation } from "../lib/workflowsShared.tsx";
+import { useWorkflowLaunch, useWorkflowLayoutNavigation } from "../lib/useWorkflowLayoutNavigation.ts";
 
 /** Live step checklist for one workflow run, with its agent's chat a click away. */
-export default function WorkflowRunDetailView({ params, panel }: ViewProps<WorkflowRunDetailParams>) {
-  const runId = params.runId;
+export default function WorkflowRunDetailPane({ params }: ViewProps) {
+  const runId = params.runId ?? "";
+  const panel = usePanel();
   const workflowRuns = useWorkflowRuns();
-  const { openWorkflow, openAgentChat } = useWorkflowsNavigation();
+  const { openWorkflow, openAgentChat } = useWorkflowLayoutNavigation();
   const [cancelling, setCancelling] = useState(false);
   const { launch, launching } = useWorkflowLaunch();
   /** The user removed the auto-attached workflow chip from the chat this session. */
@@ -30,9 +33,7 @@ export default function WorkflowRunDetailView({ params, panel }: ViewProps<Workf
   const run = useMemo(() => ((workflowRuns.data?.runs ?? []) as WorkflowRun[]).find(candidate => candidate.id === runId), [runId, workflowRuns.data]);
   const active = run ? isRunActive(run) : false;
 
-  useEffect(() => {
-    panel.setTitle(run ? runTitle(run) : `Run ${runId}`);
-  }, [panel, run, runId]);
+  usePanelTitle(run ? runTitle(run) : `Run ${runId}`);
 
   // While the run is live, attach its workflow definition to the next chat message so the
   // agent (and the user) share the same picture of the steps. Removable like any chip.
@@ -59,12 +60,8 @@ export default function WorkflowRunDetailView({ params, panel }: ViewProps<Workf
     ];
   }, [active, attachmentDismissed, run]);
 
-  const agentId = run?.agentId ?? null;
-  useEffect(() => {
-    if (!agentId) return;
-    setChatExtras(agentId, extraAttachments.length > 0 ? { attachments: extraAttachments, onRemove: () => setAttachmentDismissed(true) } : null);
-    return () => setChatExtras(agentId, null);
-  }, [agentId, extraAttachments]);
+  const onRemoveExtraAttachment = useCallback(() => setAttachmentDismissed(true), []);
+  useAttachedAgentChat({ agentId: run?.agentId ?? null, extraAttachments, onRemoveExtraAttachment, beside: "right" });
 
   const handleCancel = useCallback(async () => {
     if (!run) return;
@@ -117,13 +114,9 @@ export default function WorkflowRunDetailView({ params, panel }: ViewProps<Workf
               <span className="text-xs text-muted">started {formatRelativeTime(run.startedAt)}</span>
               <span className="flex-1" />
               {run.agentId && (
-                <button
-                  type="button"
-                  onClick={() => openAgentChat(run.agentId!)}
-                  className="inline-flex items-center gap-1.5 px-2 py-1 text-xs font-medium rounded-lg border border-primary text-secondary hover:text-primary hover:bg-hover focus-ring cursor-pointer"
-                >
-                  <MessageSquare className="w-3.5 h-3.5" aria-hidden="true" /> Chat
-                </button>
+                <Button variant="secondary" icon={MessageSquare} onClick={() => openAgentChat(run.agentId!)}>
+                  Chat
+                </Button>
               )}
             </div>
           }

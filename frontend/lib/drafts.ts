@@ -45,6 +45,12 @@ export interface WorkflowDraft {
   agentType: string;
   steps: WorkflowStep[];
   subAgent: SubAgentSettings;
+  /**
+   * Marketplace provenance loaded with this workflow. Absent on new and cloned drafts.
+   * `Workflow["installedFrom"]` is an indexed optional, so it includes `undefined`;
+   * the RPC input is exact-optional and rejects an explicit `undefined`.
+   */
+  installedFrom?: NonNullable<Workflow["installedFrom"]>;
 }
 
 export type { Workflow, WorkflowStep };
@@ -80,10 +86,11 @@ export function toDraft(workflow: Workflow): WorkflowDraft {
     agentType: workflow.agentType,
     steps: workflow.steps.length > 0 ? [...workflow.steps] : [""],
     subAgent: { ...DEFAULT_SUB_AGENT, ...workflow.subAgent },
+    ...(workflow.installedFrom ? { installedFrom: workflow.installedFrom } : {}),
   };
 }
 
-/** Deep-ish copy of a draft so a clone can be edited independently of the source. */
+/** Deep-ish copy of a draft so a clone can be edited independently of the source. Drops marketplace provenance — a copy is not the installed item. */
 export function cloneDraft(draft: WorkflowDraft): WorkflowDraft {
   return {
     displayName: draft.displayName,
@@ -105,14 +112,16 @@ export function uniqueCloneName(baseName: string, existingNames: Iterable<string
   return `${baseName}-copy${n}`;
 }
 
-/** Drops blank steps so a stray editor row is never persisted, and fills in an empty category. */
+/** Drops blank steps so a stray editor row is never persisted, and fills in an empty category. Keeps `installedFrom` when the draft already has it. */
 export function normalizeDraft(draft: WorkflowDraft): WorkflowDraft {
+  const { installedFrom, ...fields } = draft;
   return {
-    ...draft,
+    ...fields,
     displayName: draft.displayName.trim(),
     category: draft.category.trim() || DEFAULT_CATEGORY,
     description: draft.description.trim(),
     steps: normalizeSteps(draft.steps),
+    ...(installedFrom ? { installedFrom } : {}),
   };
 }
 
@@ -172,6 +181,7 @@ export function workflowYaml(draft: WorkflowDraft): string {
     agentType: normalized.agentType,
     steps: normalized.steps,
     subAgent: normalized.subAgent,
+    ...(normalized.installedFrom ? { installedFrom: normalized.installedFrom } : {}),
   });
   return `# TokenRing workflow definition. The file name is the workflow name.\n${stringify(item)}`;
 }
@@ -190,6 +200,7 @@ export function parseWorkflowYaml(text: string): WorkflowDraft {
     agentType: item.agentType,
     steps: item.steps.length > 0 ? [...item.steps] : [""],
     subAgent: { ...DEFAULT_SUB_AGENT, ...item.subAgent },
+    ...(item.installedFrom ? { installedFrom: item.installedFrom } : {}),
   };
 }
 

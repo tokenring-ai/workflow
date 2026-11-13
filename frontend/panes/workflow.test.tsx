@@ -1,10 +1,11 @@
 import { beforeEach, describe, expect, it, mock } from "bun:test";
 import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { getPanelBadge } from "@tokenring-ai/one-frontend/dock/panelBadges.ts";
-import type { ViewDefinition, ViewParams } from "@tokenring-ai/one-frontend/dock/types.ts";
-import { createFakeDashboardApi, createFakePanelHandle, type FakeDashboardApi, renderView } from "@tokenring-ai/one-frontend/test/dock.tsx";
+import { defineView } from "@tokenring-ai/one-frontend/layout/define.ts";
+import type { ViewParams } from "@tokenring-ai/one-frontend/layout/types.ts";
+import { MessageSquare } from "lucide-react";
 import type React from "react";
+import { SWRConfig } from "swr";
 
 const PassThroughFocusTrap = ({ children }: { children: React.ReactNode }) => children;
 void mock.module("focus-trap-react", () => ({ FocusTrap: PassThroughFocusTrap, default: PassThroughFocusTrap }));
@@ -156,32 +157,68 @@ void mock.module("@tokenring-ai/one-frontend/rpc.ts", () => ({
   },
 }));
 
-const { default: contribution } = await import("../app.tsx");
-const { setNewWorkflowName } = await import("../lib/workflowsShared.tsx");
-const { resetMarketplacePath } = await import("../lib/paths.ts");
+const { default: layout } = await import("../layout.ts");
+const { default: viewsModule } = await import("../views.tsx");
+const { CORE_KINDS } = await import("@tokenring-ai/one-frontend/apps/kinds.ts");
+const { createLayoutRegistry } = await import("@tokenring-ai/one-frontend/layout/registry.ts");
+const { renderLayoutApp, renderLayoutView } = await import("@tokenring-ai/one-frontend/test/layout.tsx");
+const { setNewWorkflowName } = await import("../lib/workflowState.tsx");
 const { workflowNameError } = await import("../lib/drafts.ts");
 
-const ROUTES = ["/workflows/marketplace/:category?/:name?", "/workflows/runs/:runId", "/workflows/:workflowName?"];
-const viewById = (id: string) => contribution.views.find(view => view.id === id) as ViewDefinition<any>;
-const getView = (id: string) => contribution.views.find(view => view.id === id);
-const dashboard = contribution.dashboards[0]!;
-
-function fakeApi(): FakeDashboardApi {
-  return createFakeDashboardApi({ dashboardId: "workflows", getView });
+function ChatStub() {
+  return <p>chat stub</p>;
 }
 
-function renderWorkflowsView(viewId: string, params: ViewParams = {}, path = "/workflows", api = fakeApi()) {
-  const panel = createFakePanelHandle({ viewId, dashboardId: "workflows", panelId: viewId, params });
-  return renderView(viewById(viewId), params, { api, panel, path, routes: ROUTES });
+const chatView = defineView({
+  id: "chat",
+  kind: "agent",
+  title: params => params.agentId ?? "Chat",
+  icon: MessageSquare,
+  route: "agent/:agentId",
+  instanceKey: params => params.agentId ?? "",
+  component: ChatStub,
+});
+
+const registry = createLayoutRegistry({ apps: layout.apps, views: [...viewsModule.views, chatView], kinds: [...CORE_KINDS, ...layout.kinds] });
+const viewById = (id: string) => viewsModule.views.find(view => view.id === id)!;
+
+function FreshSwr({ children }: { children: React.ReactNode }) {
+  return <SWRConfig value={{ dedupingInterval: 0, provider: () => new Map() }}>{children}</SWRConfig>;
 }
 
-const pathname = () => screen.getByTestId("pathname").textContent;
+let current: ReturnType<typeof renderLayoutApp> | null = null;
 
-describe("Workflows dashboard views", () => {
+/** The whole Workflows app at a URL. */
+function renderWorkflowsApp(url = "/workflows") {
+  current = renderLayoutApp({ registry, url, wrapper: FreshSwr });
+  return current;
+}
+
+/** One view alone in a throwaway app (the other workflow views and chat can still be opened). */
+function renderWorkflowsView(viewId: string, params: ViewParams = {}) {
+  current = renderLayoutView(viewById(viewId), {
+    params,
+    views: [viewById("workflow-editor"), viewById("workflow-create"), viewById("workflow-run-detail"), chatView],
+  });
+  return current;
+}
+
+const pathname = () => current?.location().pathname;
+const panelOpen = (key: string) => document.querySelector(`[data-panel="${key}"]`) !== null;
+/** Queries scoped to one open panel (the app also shows other panels' content). */
+const inPanel = (key: string) => within(document.querySelector(`[data-panel="${key}"]`) as HTMLElement);
+const hasUnsavedBadge = () => screen.queryAllByRole("img", { name: "Unsaved changes" }).length > 0;
+
+/** Picks an editor action from its ⋯ menu. */
+async function chooseAction(user: ReturnType<typeof userEvent.setup>, name: string) {
+  await user.click(await screen.findByRole("button", { name: "More workflow actions" }));
+  await user.click(await screen.findByRole("menuitem", { name }));
+}
+
+describe("Workflows app", () => {
   beforeEach(() => {
     localStorage.clear();
     setNewWorkflowName("");
-    resetMarketplacePath();
     for (const fn of [
       createWorkflow,
       updateWorkflow,
@@ -202,51 +239,52 @@ describe("Workflows dashboard views", () => {
   describe("library", () => {
     it("groups workflows by category and opens one when clicked", async () => {
       const user = userEvent.setup();
-      const { api } = renderWorkflowsView("workflow-library");
+      renderWorkflowsApp();
 
-      expect(await screen.findByText("Code Review")).toBeInTheDocument();
-      expect(screen.getByText("No active workflows")).toBeInTheDocument();
+      const library = inPanel("workflow-library:_");
+      expect(await library.findByText("Code Review")).toBeInTheDocument();
+      expect(panelOpen("workflows-overview:_")).toBe(true);
 
-      await user.click(screen.getByText("All-Package Bug Hunter"));
-      expect(api.opened).toEqual([expect.objectContaining({ viewId: "workflow-editor", params: { name: "bugHunter" } })]);
-      expect(pathname()).toBe("/workflows/bugHunter");
+      await user.click(library.getByText("All-Package Bug Hunter"));
+      await waitFor(() => expect(pathname()).toBe("/workflows/bugHunter"));
+      expect(panelOpen("workflow-editor:bugHunter")).toBe(true);
+      // The Runs page has done its job once something is open in its place.
+      expect(panelOpen("workflows-overview:_")).toBe(false);
     });
 
     it("runs a workflow from the sidebar without selecting it first", async () => {
       const user = userEvent.setup();
-      const { api } = renderWorkflowsView("workflow-library");
+      renderWorkflowsApp();
 
       await user.click(await screen.findByRole("button", { name: "Run All-Package Bug Hunter" }));
       await waitFor(() => expect(spawnWorkflow).toHaveBeenCalledWith({ name: "bugHunter", headless: false }));
       // The workflow opens so the new run shows up in its editor.
-      await waitFor(() => expect(api.opened.at(-1)).toMatchObject({ viewId: "workflow-editor", params: { name: "bugHunter" } }));
+      await waitFor(() => expect(pathname()).toBe("/workflows/bugHunter"));
     });
 
-    it("watches a running workflow: opens its run panel and docks its agent chat", async () => {
+    it("watches a running workflow from the Runs page: opens its run with its agent chat beside it", async () => {
       const user = userEvent.setup();
       workflowRuns = [activeRun];
-      const { api } = renderWorkflowsView("workflow-library");
+      renderWorkflowsApp();
 
-      await user.click(await screen.findByRole("button", { name: "Watch All-Package Bug Hunter run" }));
-      expect(api.opened.map(open => [open.viewId, open.params])).toEqual([
-        ["workflow-run-detail", { runId: "run-1" }],
-        ["chat", { agentId: "agent-1" }],
-      ]);
-      expect(pathname()).toBe("/workflows/runs/run-1");
+      await user.click(await inPanel("workflows-overview:_").findByRole("button", { name: "Watch All-Package Bug Hunter run" }));
+      await waitFor(() => expect(pathname()).toBe("/workflows/runs/run-1"));
+      expect(panelOpen("workflow-run-detail:run-1")).toBe(true);
+      await waitFor(() => expect(panelOpen("chat:agent-1")).toBe(true));
     });
 
     it("duplicates a workflow from its row and opens the copy", async () => {
       const user = userEvent.setup();
-      const { api } = renderWorkflowsView("workflow-library");
+      renderWorkflowsApp();
 
       await user.click(await screen.findByRole("button", { name: "Duplicate All-Package Bug Hunter" }));
       await waitFor(() => expect(duplicateWorkflow).toHaveBeenCalledWith({ name: "bugHunter" }));
-      await waitFor(() => expect(api.opened.at(-1)).toMatchObject({ viewId: "workflow-editor", params: { name: "bugHunter-copy" } }));
+      await waitFor(() => expect(pathname()).toBe("/workflows/bugHunter-copy"));
     });
 
     it("imports a YAML file, blocking a name that is already taken", async () => {
       const user = userEvent.setup();
-      const { api } = renderWorkflowsView("workflow-library");
+      renderWorkflowsApp();
 
       const yaml = "name: bugHunter\ndisplayName: Imported\nagentType: leader\nsteps:\n  - hello\n";
       await user.upload(await screen.findByTestId("workflow-import-input"), new File([yaml], "bugHunter.yaml", { type: "application/yaml" }));
@@ -261,7 +299,7 @@ describe("Workflows dashboard views", () => {
       await user.click(screen.getByRole("button", { name: "Import" }));
 
       await waitFor(() => expect(importWorkflow).toHaveBeenCalledWith({ yaml, name: "bugHunter2" }));
-      await waitFor(() => expect(api.opened.at(-1)).toMatchObject({ viewId: "workflow-editor", params: { name: "bugHunter2" } }));
+      await waitFor(() => expect(pathname()).toBe("/workflows/bugHunter2"));
       expect(screen.queryByLabelText("Workflow name")).toBeNull();
     });
 
@@ -270,7 +308,7 @@ describe("Workflows dashboard views", () => {
       importWorkflow.mockImplementationOnce(async () => {
         throw new Error("Invalid workflow file: agentType: Invalid input");
       });
-      renderWorkflowsView("workflow-library");
+      renderWorkflowsApp();
 
       await user.upload(await screen.findByTestId("workflow-import-input"), new File(["displayName: X\n"], "fresh.yml"));
       expect(await screen.findByLabelText("Workflow name")).toHaveValue("fresh");
@@ -280,26 +318,29 @@ describe("Workflows dashboard views", () => {
 
     it("marks workflows with unsaved drafts", async () => {
       localStorage.setItem("workflows:drafts", JSON.stringify({ bugHunter: { ...bugHunter, description: "changed", steps: [] } }));
-      renderWorkflowsView("workflow-library");
+      renderWorkflowsApp();
       expect(await screen.findByTitle("Unsaved changes")).toBeInTheDocument();
     });
   });
 
   describe("overview", () => {
-    it("shows running workflows and launches from the grid", async () => {
+    it("shows running runs with their step, and nothing that repeats the library", async () => {
+      workflowRuns = [activeRun];
+      renderWorkflowsApp();
+
+      const overview = inPanel("workflows-overview:_");
+      expect(await overview.findByRole("button", { name: "Watch All-Package Bug Hunter run" })).toBeInTheDocument();
+      expect(overview.getByText(/Step 2 of 2: \/agent run --type code-quality-engineer fix bugs/)).toBeInTheDocument();
+      // Workflows are launched from the library, not a second grid here.
+      expect(overview.queryByRole("button", { name: /^Launch / })).toBeNull();
+    });
+
+    it("opens a run from the overview", async () => {
       const user = userEvent.setup();
       workflowRuns = [activeRun];
-      const { api } = renderWorkflowsView("workflows-overview");
-
-      expect(await screen.findByText("Running workflows")).toBeInTheDocument();
-      expect(screen.getByRole("button", { name: "Watch All-Package Bug Hunter run" })).toBeInTheDocument();
-      expect(screen.getByText(/Step 2 of 2: \/agent run --type code-quality-engineer fix bugs/)).toBeInTheDocument();
-
-      await user.click(screen.getByRole("button", { name: "Launch All-Package Bug Hunter" }));
-      await waitFor(() => expect(spawnWorkflow).toHaveBeenCalledWith({ name: "bugHunter", headless: false }));
-
-      await user.click(screen.getByRole("button", { name: "Watch All-Package Bug Hunter run" }));
-      expect(api.opened.some(open => open.viewId === "workflow-run-detail")).toBe(true);
+      renderWorkflowsView("workflows-overview");
+      await user.click(await screen.findByRole("button", { name: "Watch All-Package Bug Hunter run" }));
+      await waitFor(() => expect(pathname()).toBe("/test/runs/run-1"));
     });
 
     it("shows an empty state pointing at the workflow directory when nothing is installed", async () => {
@@ -314,27 +355,27 @@ describe("Workflows dashboard views", () => {
 
   describe("editor", () => {
     it("shows a workflow's steps and settings", async () => {
-      const { panel } = renderWorkflowsView("workflow-editor", { name: "bugHunter" }, "/workflows/bugHunter");
+      renderWorkflowsView("workflow-editor", { name: "bugHunter" });
 
       expect((await screen.findAllByText("bugHunter.yaml")).length).toBeGreaterThan(0);
       expect(screen.getByDisplayValue("Finds and fixes bugs")).toBeInTheDocument();
       expect(screen.getByLabelText("Step 1 chat message")).toHaveValue("List all packages in the monorepo");
       expect(screen.getByLabelText("Step 2 command")).toHaveValue("agent run");
-      await waitFor(() => expect(panel.title).toBe("All-Package Bug Hunter"));
+      await waitFor(() => expect(document.title).toContain("All-Package Bug Hunter"));
     });
 
     it("downloads the workflow as YAML", async () => {
       const user = userEvent.setup();
-      renderWorkflowsView("workflow-editor", { name: "bugHunter" }, "/workflows/bugHunter");
+      renderWorkflowsView("workflow-editor", { name: "bugHunter" });
 
-      await user.click(await screen.findByRole("button", { name: "Download workflow YAML" }));
+      await chooseAction(user, "Download YAML");
       await waitFor(() => expect(exportWorkflow).toHaveBeenCalledWith({ name: "bugHunter" }));
       expect(downloadTextFile).toHaveBeenCalledWith("bugHunter.yaml", "name: bugHunter\n", "application/yaml");
     });
 
     it("edits a command step's failure handling and retries", async () => {
       const user = userEvent.setup();
-      renderWorkflowsView("workflow-editor", { name: "bugHunter" }, "/workflows/bugHunter");
+      renderWorkflowsView("workflow-editor", { name: "bugHunter" });
 
       await user.selectOptions(await screen.findByLabelText("Step 2 on failure"), "continue");
       const retries = screen.getByLabelText("Step 2 retries");
@@ -354,7 +395,7 @@ describe("Workflows dashboard views", () => {
 
     it("saves edits to an existing workflow", async () => {
       const user = userEvent.setup();
-      renderWorkflowsView("workflow-editor", { name: "bugHunter" }, "/workflows/bugHunter");
+      renderWorkflowsView("workflow-editor", { name: "bugHunter" });
 
       const description = await screen.findByDisplayValue("Finds and fixes bugs");
       await user.clear(description);
@@ -364,30 +405,51 @@ describe("Workflows dashboard views", () => {
       await waitFor(() => expect(updateWorkflow).toHaveBeenCalled());
       expect(updateWorkflow.mock.calls[0]![0].name).toBe("bugHunter");
       expect(updateWorkflow.mock.calls[0]![0].workflow).toMatchObject({ description: "Hunts bugs everywhere" });
+      expect(updateWorkflow.mock.calls[0]![0].workflow).not.toHaveProperty("installedFrom");
+    });
+
+    it("round-trips marketplace provenance when saving an installed workflow", async () => {
+      const user = userEvent.setup();
+      const installedFrom = {
+        registry: "tokenring-ai/community",
+        id: "workflow/testing/bug-hunter",
+        version: "1.0.0",
+        author: "TokenRing Core",
+        installedAt: "2026-01-01T00:00:00.000Z",
+      };
+      workflowList = [{ ...bugHunter, installedFrom } as typeof bugHunter];
+      renderWorkflowsView("workflow-editor", { name: "bugHunter" });
+
+      const description = await screen.findByDisplayValue("Finds and fixes bugs");
+      await user.type(description, "!");
+      await user.click(screen.getByRole("button", { name: "Save" }));
+
+      await waitFor(() => expect(updateWorkflow).toHaveBeenCalled());
+      expect(updateWorkflow.mock.calls[0]![0].workflow).toMatchObject({ description: "Finds and fixes bugs!", installedFrom });
     });
 
     it("badges the tab while there are unsaved edits and clears it on save", async () => {
       const user = userEvent.setup();
-      const { panel } = renderWorkflowsView("workflow-editor", { name: "bugHunter" }, "/workflows/bugHunter");
+      renderWorkflowsView("workflow-editor", { name: "bugHunter" });
 
       const description = await screen.findByDisplayValue("Finds and fixes bugs");
-      expect(getPanelBadge(panel.panelId)).toBeNull();
+      expect(hasUnsavedBadge()).toBe(false);
       await user.type(description, "!");
-      await waitFor(() => expect(getPanelBadge(panel.panelId)).toMatchObject({ title: "Unsaved changes", tone: "warning" }));
+      await waitFor(() => expect(hasUnsavedBadge()).toBe(true));
 
       // The mocked list never changes, so model the saved version coming back from disk.
       workflowList = [{ ...bugHunter, description: "Finds and fixes bugs!" }];
       await user.click(screen.getByRole("button", { name: "Save" }));
       await waitFor(() => expect(updateWorkflow).toHaveBeenCalled());
       await waitFor(() => expect(JSON.parse(localStorage.getItem("workflows:drafts") ?? "{}").bugHunter).toBeUndefined());
-      await waitFor(() => expect(getPanelBadge(panel.panelId)).toBeNull());
+      await waitFor(() => expect(hasUnsavedBadge()).toBe(false));
     });
 
     it("keeps edits typed while a save is in flight", async () => {
       const user = userEvent.setup();
       let finishSave!: () => void;
       updateWorkflow.mockImplementationOnce(() => new Promise(resolve => (finishSave = () => resolve({ workflow: bugHunter }))));
-      const { panel } = renderWorkflowsView("workflow-editor", { name: "bugHunter" }, "/workflows/bugHunter");
+      renderWorkflowsView("workflow-editor", { name: "bugHunter" });
 
       const description = await screen.findByDisplayValue("Finds and fixes bugs");
       await user.type(description, " one");
@@ -401,51 +463,51 @@ describe("Workflows dashboard views", () => {
       await waitFor(() => expect(screen.getByRole("button", { name: "Save" })).not.toBeDisabled());
       expect(JSON.parse(localStorage.getItem("workflows:drafts") ?? "{}").bugHunter).toMatchObject({ description: "Finds and fixes bugs one two" });
       expect(description).toHaveValue("Finds and fixes bugs one two");
-      expect(getPanelBadge(panel.panelId)).toMatchObject({ tone: "warning" });
+      expect(hasUnsavedBadge()).toBe(true);
     });
 
     it("deletes a workflow after confirmation and closes its panel", async () => {
       const user = userEvent.setup();
-      const { api, panel } = renderWorkflowsView("workflow-editor", { name: "bugHunter" }, "/workflows/bugHunter");
+      renderWorkflowsView("workflow-editor", { name: "bugHunter" });
 
-      await user.click(await screen.findByRole("button", { name: "Delete workflow" }));
+      await chooseAction(user, "Delete workflow…");
       await user.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Delete" }));
 
       await waitFor(() => expect(deleteWorkflow).toHaveBeenCalledWith({ name: "bugHunter" }));
-      await waitFor(() => expect(panel.closed).toBe(true));
-      expect(api.opened).toEqual([expect.objectContaining({ viewId: "workflows-overview" })]);
+      await waitFor(() => expect(panelOpen("workflow-editor:bugHunter")).toBe(false));
     });
 
     it("clones the workflow into the create form", async () => {
       const user = userEvent.setup();
-      const { api } = renderWorkflowsView("workflow-editor", { name: "bugHunter" }, "/workflows/bugHunter");
+      renderWorkflowsView("workflow-editor", { name: "bugHunter" });
 
-      await user.click(await screen.findByRole("button", { name: /Clone/ }));
-      expect(api.opened).toEqual([expect.objectContaining({ viewId: "workflow-create" })]);
-      expect(pathname()).toBe("/workflows/new");
+      await chooseAction(user, "Clone");
+      await waitFor(() => expect(pathname()).toBe("/test/new"));
+      expect(panelOpen("workflow-create:_")).toBe(true);
       expect(JSON.parse(localStorage.getItem("workflows:drafts") ?? "{}").__new__).toMatchObject({ displayName: "All-Package Bug Hunter (copy)" });
     });
 
     it("shows the step an active run is on, opens its agent chat and cancels it", async () => {
       const user = userEvent.setup();
       workflowRuns = [activeRun];
-      const { api } = renderWorkflowsView("workflow-editor", { name: "bugHunter" }, "/workflows/bugHunter");
+      renderWorkflowsView("workflow-editor", { name: "bugHunter" });
 
       expect(await screen.findByText(/running step 2 of 2/)).toBeInTheDocument();
-      await user.click(screen.getAllByRole("button", { name: "Open agent" })[0]!);
-      expect(api.opened).toEqual([expect.objectContaining({ viewId: "chat", params: { agentId: "agent-1" } })]);
 
       await user.click(screen.getByRole("button", { name: /Cancel/ }));
       expect(cancelRun).not.toHaveBeenCalled();
       await user.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Cancel run" }));
       await waitFor(() => expect(cancelRun).toHaveBeenCalledWith({ runId: "run-1" }));
+
+      await user.click(screen.getAllByRole("button", { name: "Open agent" })[0]!);
+      await waitFor(() => expect(panelOpen("chat:agent-1")).toBe(true));
     });
 
     it("runs the workflow attended or headless", async () => {
       const user = userEvent.setup();
-      renderWorkflowsView("workflow-editor", { name: "bugHunter" }, "/workflows/bugHunter");
+      renderWorkflowsView("workflow-editor", { name: "bugHunter" });
 
-      await user.click(await screen.findByRole("button", { name: "Run headless" }));
+      await chooseAction(user, "Run headless (never asks you)");
       await waitFor(() => expect(spawnWorkflow).toHaveBeenCalledWith({ name: "bugHunter", headless: true }));
       await waitFor(() => expect(screen.getByRole("button", { name: "Run" })).not.toBeDisabled());
       await user.click(screen.getByRole("button", { name: "Run" }));
@@ -454,17 +516,17 @@ describe("Workflows dashboard views", () => {
 
     it("shows a not-found state for a workflow that no longer exists", async () => {
       const user = userEvent.setup();
-      const { panel } = renderWorkflowsView("workflow-editor", { name: "ghost" }, "/workflows/ghost");
+      renderWorkflowsView("workflow-editor", { name: "ghost" });
       expect(await screen.findByText("Workflow not found")).toBeInTheDocument();
       await user.click(screen.getByRole("button", { name: "Close panel" }));
-      expect(panel.closed).toBe(true);
+      await waitFor(() => expect(panelOpen("workflow-editor:ghost")).toBe(false));
     });
   });
 
   describe("create", () => {
     it("creates a new workflow with a chat step and opens it", async () => {
       const user = userEvent.setup();
-      const { api, panel } = renderWorkflowsView("workflow-create", {}, "/workflows/new");
+      renderWorkflowsView("workflow-create");
 
       await user.type(await screen.findByLabelText(/^Name/), "greeter");
       await user.type(screen.getByLabelText(/Display name/), "Greeter");
@@ -474,16 +536,16 @@ describe("Workflows dashboard views", () => {
 
       await waitFor(() => expect(createWorkflow).toHaveBeenCalled());
       expect(createWorkflow.mock.calls[0]![0].name).toBe("greeter");
-      await waitFor(() => expect(panel.closed).toBe(true));
-      expect(api.opened).toEqual([expect.objectContaining({ viewId: "workflow-editor", params: { name: "greeter" } })]);
-      expect(pathname()).toBe("/workflows/greeter");
+      await waitFor(() => expect(panelOpen("workflow-create:_")).toBe(false));
+      expect(panelOpen("workflow-editor:greeter")).toBe(true);
+      expect(pathname()).toBe("/test/greeter");
     });
   });
 
   describe("create form guidance", () => {
     it("lists everything that still blocks Create", async () => {
       const user = userEvent.setup();
-      renderWorkflowsView("workflow-create", {}, "/workflows/new");
+      renderWorkflowsView("workflow-create");
 
       const checklist = await screen.findByRole("status");
       for (const item of ["A name", "A display name", "An agent type", "At least one step"]) expect(within(checklist).getByText(item)).toBeInTheDocument();
@@ -501,21 +563,21 @@ describe("Workflows dashboard views", () => {
 
     it("closes an untouched form at once but confirms before discarding a filled one", async () => {
       const user = userEvent.setup();
-      const first = renderWorkflowsView("workflow-create", {}, "/workflows/new");
+      const first = renderWorkflowsView("workflow-create");
       await user.click(await screen.findByRole("button", { name: "Cancel" }));
-      expect(first.panel.closed).toBe(true);
+      await waitFor(() => expect(panelOpen("workflow-create:_")).toBe(false));
       first.unmount();
 
-      const second = renderWorkflowsView("workflow-create", {}, "/workflows/new");
+      renderWorkflowsView("workflow-create");
       await user.type(await screen.findByLabelText(/Display name/), "Greeter");
       await user.click(screen.getByRole("button", { name: "Cancel" }));
-      expect(second.panel.closed).toBe(false);
+      expect(panelOpen("workflow-create:_")).toBe(true);
       await user.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Keep editing" }));
       expect(screen.getByLabelText(/Display name/)).toHaveValue("Greeter");
 
       await user.click(screen.getByRole("button", { name: "Cancel" }));
       await user.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Discard" }));
-      expect(second.panel.closed).toBe(true);
+      await waitFor(() => expect(panelOpen("workflow-create:_")).toBe(false));
     });
   });
 
@@ -530,7 +592,7 @@ describe("Workflows dashboard views", () => {
 
     it("blocks creating a workflow with a reserved name", async () => {
       const user = userEvent.setup();
-      renderWorkflowsView("workflow-create", {}, "/workflows/new");
+      renderWorkflowsView("workflow-create");
 
       await user.type(await screen.findByLabelText(/^Name/), "marketplace");
       await user.type(screen.getByLabelText(/Display name/), "Shop");
@@ -545,14 +607,22 @@ describe("Workflows dashboard views", () => {
   });
 
   describe("runs widget", () => {
-    it("opens a finished run's detail panel even when the URL already names its workflow", async () => {
+    it("opens a finished run's detail panel", async () => {
       const user = userEvent.setup();
       workflowRuns = [{ ...activeRun, status: "completed", agentId: null, finishedAt: 1_700_000_100_000 }];
-      const { api } = renderWorkflowsView("workflow-runs", {}, "/workflows/bugHunter");
+      renderWorkflowsView("workflow-runs");
 
       await user.click(await screen.findByRole("button", { name: "Open workflow run All-Package Bug Hunter" }));
-      expect(api.opened).toEqual([expect.objectContaining({ viewId: "workflow-run-detail", params: { runId: "run-1" } })]);
-      expect(pathname()).toBe("/workflows/runs/run-1");
+      await waitFor(() => expect(pathname()).toBe("/test/runs/run-1"));
+      expect(panelOpen("workflow-run-detail:run-1")).toBe(true);
+    });
+
+    it("opens an active run's agent chat instead", async () => {
+      const user = userEvent.setup();
+      workflowRuns = [activeRun];
+      renderWorkflowsView("workflow-runs");
+      await user.click(await screen.findByRole("button", { name: "Open workflow run All-Package Bug Hunter" }));
+      await waitFor(() => expect(panelOpen("chat:agent-1")).toBe(true));
     });
   });
 
@@ -560,15 +630,15 @@ describe("Workflows dashboard views", () => {
     it("shows the run's progress, opens its chat and cancels it", async () => {
       const user = userEvent.setup();
       workflowRuns = [activeRun];
-      const { api, panel } = renderWorkflowsView("workflow-run-detail", { runId: "run-1" }, "/workflows/runs/run-1");
+      renderWorkflowsApp("/workflows/runs/run-1");
 
-      expect(await screen.findByText(/Step 2 of 2/)).toBeInTheDocument();
-      await waitFor(() => expect(panel.title).toBe("All-Package Bug Hunter"));
+      const detail = inPanel("workflow-run-detail:run-1");
+      expect(await detail.findByText(/Step 2 of 2/)).toBeInTheDocument();
+      await waitFor(() => expect(document.title).toContain("All-Package Bug Hunter"));
+      // The run's agent chat is attached beside the run.
+      await waitFor(() => expect(panelOpen("chat:agent-1")).toBe(true));
 
-      await user.click(screen.getByRole("button", { name: "Chat" }));
-      expect(api.opened).toEqual([expect.objectContaining({ viewId: "chat", params: { agentId: "agent-1" } })]);
-
-      await user.click(screen.getByRole("button", { name: /Cancel/ }));
+      await user.click(detail.getByRole("button", { name: /Cancel/ }));
       expect(cancelRun).not.toHaveBeenCalled();
       await user.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Cancel run" }));
       await waitFor(() => expect(cancelRun).toHaveBeenCalledWith({ runId: "run-1" }));
@@ -588,90 +658,77 @@ describe("Workflows dashboard views", () => {
           ],
         },
       ];
-      renderWorkflowsView("workflow-run-detail", { runId: "run-1" }, "/workflows/runs/run-1");
+      renderWorkflowsApp("/workflows/runs/run-1");
 
-      const steps = within(await screen.findByRole("region", { name: "Workflow run progress" })).getAllByRole("listitem");
+      const steps = within(await inPanel("workflow-run-detail:run-1").findByRole("region", { name: "Workflow run progress" })).getAllByRole("listitem");
       expect(within(steps[0]!).getByText(/^Took 42/)).toBeInTheDocument();
       expect(within(steps[1]!).getByText(/^Took 3/)).toBeInTheDocument();
-      expect(screen.queryByRole("button", { name: /Cancel/ })).toBeNull();
+      expect(inPanel("workflow-run-detail:run-1").queryByRole("button", { name: /Cancel/ })).toBeNull();
 
-      await user.click(screen.getByRole("button", { name: /Re-run/ }));
+      await user.click(inPanel("workflow-run-detail:run-1").getByRole("button", { name: /Re-run/ }));
       await waitFor(() => expect(spawnWorkflow).toHaveBeenCalledWith({ name: "bugHunter", headless: false }));
     });
 
     it("does not offer a re-run while the run is still going", async () => {
       workflowRuns = [activeRun];
-      renderWorkflowsView("workflow-run-detail", { runId: "run-1" }, "/workflows/runs/run-1");
-      expect(await screen.findByText(/Step 2 of 2/)).toBeInTheDocument();
-      expect(screen.queryByRole("button", { name: /Re-run/ })).toBeNull();
+      renderWorkflowsApp("/workflows/runs/run-1");
+      const detail = inPanel("workflow-run-detail:run-1");
+      expect(await detail.findByText(/Step 2 of 2/)).toBeInTheDocument();
+      expect(detail.queryByRole("button", { name: /Re-run/ })).toBeNull();
     });
 
     it("shows a not-found state for an unknown run", async () => {
-      renderWorkflowsView("workflow-run-detail", { runId: "nope" }, "/workflows/runs/nope");
+      renderWorkflowsView("workflow-run-detail", { runId: "nope" });
       expect(await screen.findByText("Run not found")).toBeInTheDocument();
     });
   });
 
   describe("marketplace", () => {
-    it("lists registry workflows and installs one from a card", async () => {
+    it("sends Browse marketplace to the Marketplace app", async () => {
       const user = userEvent.setup();
-      renderWorkflowsView("workflow-marketplace", {}, "/workflows/marketplace");
-
-      expect(await screen.findByText("Coverage Sweep")).toBeInTheDocument();
-      await user.click(screen.getByRole("button", { name: "Install Coverage Sweep" }));
-      await waitFor(() => expect(installMarketplaceItem).toHaveBeenCalledWith({ id: "workflow/testing/coverage-sweep" }));
-    });
-
-    it("previews a workflow's agent and steps on its detail page", async () => {
-      renderWorkflowsView("workflow-marketplace", {}, "/workflows/marketplace/testing/coverage-sweep");
-      expect(await screen.findByText("Adds the tests you are missing.")).toBeInTheDocument();
-      expect(screen.getByText("test-engineer")).toBeInTheDocument();
-    });
-
-    it("restores the selected item when the marketplace tab is re-activated", async () => {
-      renderWorkflowsView("workflow-marketplace", {}, "/workflows/marketplace/testing/coverage-sweep");
-      expect(await screen.findByText("Adds the tests you are missing.")).toBeInTheDocument();
-
-      // Another tab took the URL; switching back must not drop the item.
-      const elsewhere = { pathname: "/workflows/bugHunter", params: { workflowName: "bugHunter" }, searchParams: new URLSearchParams() };
-      const panel = { panelId: "workflow-marketplace", viewId: "workflow-marketplace", params: {} };
-      expect(dashboard.pathForActivePanel?.(panel, elsewhere)).toBe("/workflows/marketplace/testing/coverage-sweep");
+      renderWorkflowsApp("/workflows");
+      await user.click(await screen.findByRole("button", { name: "Browse marketplace" }));
+      expect(pathname()).toBe("/marketplace/workflow");
     });
   });
 
-  describe("dashboard definition", () => {
-    it("opens the panel named by the route in the main area", () => {
-      const api = fakeApi();
-      api.panels.push({ panelId: "workflow-library", viewId: "workflow-library", params: {}, title: "Workflows" });
-      const match = (pathname: string, params: Record<string, string | undefined>) => ({ pathname, params, searchParams: new URLSearchParams() });
+  describe("name validation", () => {
+    it("rejects names that collide with app routes", () => {
+      expect(workflowNameError("new")).toMatch(/reserved/);
+      expect(workflowNameError("Marketplace")).toMatch(/reserved/);
+      expect(workflowNameError("newsletter")).toBeNull();
+      expect(workflowNameError("-bad")).toMatch(/letters, numbers/);
+      expect(workflowNameError("")).toBeNull();
+    });
+  });
 
-      dashboard.onNavigate?.(match("/workflows", {}), api);
-      dashboard.onNavigate?.(match("/workflows/bugHunter", { workflowName: "bugHunter" }), api);
-      dashboard.onNavigate?.(match("/workflows/new", { workflowName: "new" }), api);
-      dashboard.onNavigate?.(match("/workflows/runs/run-1", { runId: "run-1" }), api);
-      dashboard.onNavigate?.(match("/workflows/marketplace", {}), api);
-
-      expect(api.opened.map(open => [open.viewId, open.params])).toEqual([
-        ["workflows-overview", {}],
-        ["workflow-editor", { name: "bugHunter" }],
-        ["workflow-create", {}],
-        ["workflow-run-detail", { runId: "run-1" }],
-        ["workflow-marketplace", {}],
-      ]);
-      expect(api.opened[0]!.options).toMatchObject({ position: "right", referencePanelId: "workflow-library" });
-      expect(api.opened[1]!.options).toMatchObject({ position: "tab", referencePanelId: "workflows-overview" });
+  describe("layout", () => {
+    it("keeps the old dashboard's identity and can host agent chats", () => {
+      expect(layout.apps[0]).toMatchObject({
+        id: "workflows",
+        path: "/workflows",
+        label: "Workflows",
+        group: "Build",
+        shortLabel: "WF",
+        defaultPinned: true,
+        gradient: "from-cyan-500 to-teal-600",
+      });
+      expect(layout.apps[0]!.views).toContain("chat");
     });
 
-    it("maps the active panel back to a URL", () => {
-      const match = { pathname: "/workflows", params: {}, searchParams: new URLSearchParams() };
-      const path = (viewId: string, params: ViewParams = {}) => dashboard.pathForActivePanel?.({ panelId: viewId, viewId, params }, match);
-      expect(path("workflow-editor", { name: "bugHunter" })).toBe("/workflows/bugHunter");
-      expect(path("workflow-create")).toBe("/workflows/new");
-      expect(path("workflow-run-detail", { runId: "run-1" })).toBe("/workflows/runs/run-1");
-      expect(path("workflow-marketplace")).toBe("/workflows/marketplace");
-      expect(path("workflows-overview")).toBe("/workflows");
-      expect(path("workflow-library")).toBeNull();
-      expect(path("workflow-runs")).toBeNull();
+    it("keeps every URL", () => {
+      const at = (path: string) => registry.routes.resolve(path);
+      expect(at("/workflows")?.viewId).toBe("workflows-overview");
+      expect(at("/workflows/new")?.viewId).toBe("workflow-create");
+      expect(at("/workflows/bugHunter")).toMatchObject({ viewId: "workflow-editor", params: { name: "bugHunter" } });
+      expect(at("/workflows/runs/run-1")).toMatchObject({ viewId: "workflow-run-detail", params: { runId: "run-1" } });
+    });
+
+    it("opens the workflow named by the URL beside the library", async () => {
+      renderWorkflowsApp("/workflows/bugHunter");
+      expect((await screen.findAllByText("bugHunter.yaml")).length).toBeGreaterThan(0);
+      expect(panelOpen("workflow-library:_")).toBe(true);
+      expect(panelOpen("workflow-editor:bugHunter")).toBe(true);
     });
   });
 });

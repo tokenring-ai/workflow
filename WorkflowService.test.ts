@@ -107,7 +107,32 @@ describe("WorkflowService", () => {
 
     const updated = await service.updateWorkflow("bugHunter", { ...sampleWorkflow, displayName: "Renamed", steps: ["one"] });
     expect(updated).toMatchObject({ name: "bugHunter", displayName: "Renamed", steps: ["one"] });
+    expect(updated.installedFrom).toBeUndefined();
     expect((await service.getWorkflow("bugHunter"))?.displayName).toBe("Renamed");
+  });
+
+  test("updateWorkflow keeps installedFrom when a marketplace workflow is saved without it", async () => {
+    const dir = tempDir();
+    const service = makeService(dir);
+    const installedFrom = {
+      registry: "tokenring-ai/community",
+      id: "workflow/testing/bug-hunter",
+      version: "1.0.0",
+      author: "TokenRing Core",
+      installedAt: "2026-01-01T00:00:00.000Z",
+    };
+    await service.createWorkflow("bugHunter", { ...sampleWorkflow, installedFrom });
+
+    const updated = await service.updateWorkflow("bugHunter", { ...sampleWorkflow, displayName: "Renamed" });
+    expect(updated.installedFrom).toEqual(installedFrom);
+    expect((await service.getWorkflow("bugHunter"))?.installedFrom).toEqual(installedFrom);
+    expect((YAML.parse(fs.readFileSync(path.join(dir, "bugHunter.yaml"), "utf-8")) as { installedFrom?: unknown }).installedFrom).toEqual(installedFrom);
+
+    // A payload that carries its own stamp (marketplace update, or an editor round-trip) replaces it.
+    const replacedFrom = { ...installedFrom, version: "1.2.0", installedAt: "2026-02-01T00:00:00.000Z" };
+    const replaced = await service.updateWorkflow("bugHunter", { ...sampleWorkflow, installedFrom: replacedFrom });
+    expect(replaced.installedFrom).toEqual(replacedFrom);
+    expect((await service.getWorkflow("bugHunter"))?.installedFrom).toEqual(replacedFrom);
   });
 
   test("updateWorkflow throws when the workflow does not exist", async () => {
