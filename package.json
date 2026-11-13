@@ -8,8 +8,8 @@
     "@tokenring-ai/chat": "workspace:*",
     "@tokenring-ai/rpc": "workspace:*",
     "@tokenring-ai/utility": "workspace:*",
-    "yaml": "^2.9.0",
-    "zod": "^4.4.3"
+    "yaml": "^2.9.1",
+    "zod": "^4.6.7"
   },
   "exports": {
     ".": "./index.ts",
