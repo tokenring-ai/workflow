@@ -2,6 +2,12 @@ import { InstallSourceSchema, SubAgentConfigSchema } from "@tokenring-ai/agent/s
 import type { ConfigFieldMeta } from "@tokenring-ai/app/config/metadata";
 import z from "zod";
 
+/** Most times a failed step is re-run; the YAML schema, the tools and the service all hold to it. */
+export const MAX_STEP_RETRIES = 10;
+
+/** Longest step output or run message kept in a run record (and streamed); full responses stay in the agent's history. */
+export const MAX_STEP_OUTPUT_CHARS = 4000;
+
 /**
  * A structured workflow step that invokes a registered agent command.
  *
@@ -23,8 +29,9 @@ export const WorkflowCommandStepSchema = z.object({
     .number()
     .int()
     .min(0)
+    .max(MAX_STEP_RETRIES)
     .optional()
-    .meta({ description: "Re-run a failed step up to this many times before handling the failure" } satisfies ConfigFieldMeta),
+    .meta({ description: `Re-run a failed step up to this many times (at most ${MAX_STEP_RETRIES}) before handling the failure` } satisfies ConfigFieldMeta),
 });
 
 /** Per-step execution options; plain-string steps use these defaults. */
@@ -87,8 +94,11 @@ export type Workflow = z.output<typeof WorkflowSchema>;
 /**
  * Where a run is in its lifecycle. `starting` covers the window between the run being recorded and
  * its agent picking up the first step; everything from `completed` on is terminal.
+ *
+ * - `completedWithErrors`: every step ran, but at least one failed under `onError: "continue"`.
+ * - `interrupted`: the app stopped while the run was in flight. Never re-run automatically; it can be run again.
  */
-export const WorkflowRunStatusSchema = z.enum(["starting", "running", "completed", "failed", "cancelled"]);
+export const WorkflowRunStatusSchema = z.enum(["starting", "running", "completed", "completedWithErrors", "failed", "cancelled", "interrupted"]);
 
 export type WorkflowRunStatus = z.output<typeof WorkflowRunStatusSchema>;
 
@@ -100,6 +110,12 @@ export const WorkflowRunSchema = z.object({
   agentType: z.string(),
   /** Null until the agent running the workflow has been created. */
   agentId: z.string().nullable(),
+  /** The agent job (AgentJobService) running this workflow; null until it starts, and for runs from older versions. */
+  jobId: z.string().nullable().default(null),
+  /** The run this one was started to run again, if any. */
+  rerunOf: z.string().nullable().default(null),
+  /** What the run's agent spent, read from its job when the run ended. */
+  costUsd: z.number().nullable().default(null),
   /** The steps as they were when the run started; later edits to the workflow file don't affect it. */
   steps: z.array(WorkflowStepSchema),
   /** What happened to each step, in order. Older runs (and persistence from older versions) may lack records. */

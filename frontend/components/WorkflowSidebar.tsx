@@ -1,12 +1,35 @@
-import NavigationSidebarHeader from "@tokenring-ai/one-frontend/components/layout/NavigationSidebarHeader.tsx";
 import SidebarCategoryAccordion from "@tokenring-ai/one-frontend/components/layout/SidebarCategoryAccordion.tsx";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@tokenring-ai/one-frontend/components/ui/dropdown-menu.tsx";
 import ErrorState from "@tokenring-ai/one-frontend/components/ui/ErrorState.tsx";
 import LaunchButton from "@tokenring-ai/one-frontend/components/ui/LaunchButton.tsx";
 import ListItemWithActions from "@tokenring-ai/one-frontend/components/ui/ListItemWithActions.tsx";
+import ViewHeader from "@tokenring-ai/one-frontend/components/ui/ViewHeader.tsx";
+import { Button } from "@tokenring-ai/one-frontend/ui";
 import type { Workflow, WorkflowRun } from "@tokenring-ai/workflow/schema";
-import { Copy, GitBranch, History, Loader2, Plus, Store, Upload } from "lucide-react";
-import { useRef } from "react";
+import { Copy, GitBranch, History, Loader2, MoreHorizontal, Plus, Store, Upload } from "lucide-react";
+import { type ReactNode, useRef } from "react";
 import { DEFAULT_CATEGORY, matchesWorkflowFilter, workflowTitle } from "../lib/drafts.ts";
+import { RunningCountBadge } from "./RunPanels.tsx";
+
+/** 28px hit targets for the row's buttons. */
+const ROW_BUTTON = "grid h-7 w-7 place-items-center rounded shrink-0 transition-colors cursor-pointer focus-ring";
+/** The ⋯ menu shows on hover/focus, on touch, and while its menu is open; Run stays visible. */
+const ROW_REVEAL = "opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 data-[state=open]:opacity-100 [@media(hover:none)]:opacity-100";
+
+/** A labelled icon button for the sidebar header (tooltip and accessible name are the same text). */
+function IconAction({ label, onClick, children }: { label: string; onClick: () => void; children: ReactNode }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      title={label}
+      aria-label={label}
+      className="grid h-7 w-7 place-items-center rounded-md text-muted hover:text-primary hover:bg-hover transition-colors cursor-pointer focus-ring shrink-0"
+    >
+      {children}
+    </button>
+  );
+}
 
 export function WorkflowSidebar({
   workflows,
@@ -50,39 +73,29 @@ export function WorkflowSidebar({
   const importInputRef = useRef<HTMLInputElement>(null);
   return (
     <div className="h-full flex flex-col bg-secondary border-r border-primary">
-      {/* No title: the panel's tab already says "Workflows". */}
-      <NavigationSidebarHeader
-        actions={[
-          {
-            key: "runs",
-            icon: <History className="w-3.5 h-3.5" />,
-            label: activeRuns.length > 0 ? `Runs (${activeRuns.length} running)` : "Runs",
-            title: activeRuns.length > 0 ? `Runs: ${activeRuns.length} running` : "Running and recent runs",
-            onClick: onGoOverview,
-          },
-          {
-            key: "marketplace",
-            icon: <Store className="w-3.5 h-3.5" />,
-            label: "Browse workflows in the marketplace",
-            title: "Browse workflows in the marketplace",
-            onClick: onBrowseMarketplace,
-          },
-          {
-            key: "import",
-            icon: <Upload className="w-3.5 h-3.5" />,
-            label: "Import workflow from YAML",
-            title: "Import workflow from YAML",
-            onClick: () => importInputRef.current?.click(),
-          },
-          {
-            key: "new",
-            icon: <Plus className="w-3.5 h-3.5" />,
-            label: "New workflow",
-            title: "New workflow",
-            onClick: onNew,
-          },
-        ]}
-      />
+      {/* No title: the panel's tab already says "Workflows". New / Import / Marketplace live here and nowhere else. */}
+      <ViewHeader variant="navigator">
+        <Button variant="secondary" icon={Plus} onClick={onNew} title="Create a new workflow">
+          New
+        </Button>
+        <IconAction label="Import workflow from a YAML file" onClick={() => importInputRef.current?.click()}>
+          <Upload className="w-3.5 h-3.5" />
+        </IconAction>
+        <IconAction label="Find workflows in the Marketplace" onClick={onBrowseMarketplace}>
+          <Store className="w-3.5 h-3.5" />
+        </IconAction>
+      </ViewHeader>
+
+      <button
+        type="button"
+        onClick={onGoOverview}
+        title={activeRuns.length > 0 ? `Runs: ${activeRuns.length} running` : "Running and recent runs"}
+        className="shrink-0 flex items-center gap-2 px-3 h-8 border-b border-primary/50 text-xs text-muted hover:text-primary hover:bg-hover transition-colors cursor-pointer focus-ring"
+      >
+        <History className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
+        <span className="flex-1 text-left">Runs</span>
+        {activeRuns.length > 0 && <RunningCountBadge count={activeRuns.length} />}
+      </button>
 
       <input
         ref={importInputRef}
@@ -143,31 +156,37 @@ export function WorkflowSidebar({
                 id={workflow.name}
                 selected={isSelected}
                 onPrimary={() => onSelect(workflow.name)}
-                alwaysShowAction={isSelected}
+                alwaysShowAction
                 primaryProps={{ title: workflow.displayName }}
-                className={`gap-0.5 pl-5 pr-1.5 py-1 rounded-none ${isSelected ? "bg-accent-muted text-accent" : "text-primary"}`}
+                className={`gap-0.5 pl-5 pr-1 py-0.5 rounded-none ${isSelected ? "bg-accent-muted text-accent" : "text-primary"}`}
                 action={
-                  <span className="flex items-center gap-0.5">
-                    <button
-                      type="button"
-                      onClick={() => onDuplicate(workflow.name)}
-                      disabled={duplicatingName !== null}
-                      title={`Duplicate ${workflowTitle(workflow)}`}
-                      aria-label={`Duplicate ${workflowTitle(workflow)}`}
-                      className="p-1 rounded text-muted hover:text-primary hover:bg-hover transition-colors cursor-pointer focus-ring disabled:opacity-40 disabled:cursor-not-allowed"
-                    >
-                      {duplicatingName === workflow.name ? <Loader2 className="w-3 h-3 animate-spin" /> : <Copy className="w-3 h-3" />}
-                    </button>
+                  <span className="flex items-center">
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <button
+                          type="button"
+                          aria-label={`More actions for ${workflowTitle(workflow)}`}
+                          title="More actions"
+                          className={`${ROW_BUTTON} text-muted hover:text-primary hover:bg-hover ${ROW_REVEAL}`}
+                        >
+                          {duplicatingName === workflow.name ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <MoreHorizontal className="w-3.5 h-3.5" />}
+                        </button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem className="gap-2 text-xs" disabled={duplicatingName !== null} onSelect={() => onDuplicate(workflow.name)}>
+                          <Copy className="w-3.5 h-3.5 text-muted" aria-hidden="true" /> Duplicate
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                     <LaunchButton
                       loading={isLaunching}
                       onClick={() => onRun(workflow.name)}
                       variant="icon"
-                      iconSize="sm"
+                      iconSize="md"
                       title={`Run ${workflowTitle(workflow)}`}
                       aria-label={`Run ${workflowTitle(workflow)}`}
-                      bgClassName={
-                        isSelected ? "text-accent hover:bg-accent/15" : "text-muted hover:text-cyan-600 dark:hover:text-cyan-400 hover:bg-cyan-500/10"
-                      }
+                      className={ROW_BUTTON}
+                      bgClassName={isSelected ? "text-accent hover:bg-accent/15" : "text-muted hover:text-accent hover:bg-accent-muted"}
                     />
                   </span>
                 }
@@ -175,8 +194,8 @@ export function WorkflowSidebar({
                 <span className="flex items-center gap-1.5 py-0.5 min-w-0">
                   <GitBranch className="w-3 h-3 shrink-0 opacity-70" />
                   <span className="flex-1 min-w-0 truncate text-xs">{workflow.displayName || workflow.name}</span>
-                  {hasActiveRun && <span className="w-1.5 h-1.5 rounded-full bg-accent animate-pulse shrink-0" title="Running" />}
-                  {dirtyNames.has(workflow.name) && <span className="w-1.5 h-1.5 rounded-full bg-accent shrink-0" title="Unsaved changes" />}
+                  {hasActiveRun && <span className="w-2 h-2 rounded-full bg-accent animate-pulse shrink-0" title="Running" />}
+                  {dirtyNames.has(workflow.name) && <span className="w-2 h-2 rounded-full bg-warning shrink-0" title="Unsaved changes" />}
                 </span>
               </ListItemWithActions>
             );

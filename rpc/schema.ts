@@ -3,6 +3,15 @@ import { SuccessSchema } from "@tokenring-ai/rpc/types";
 import { z } from "zod";
 import { WorkflowItemSchema, WorkflowRunSchema, WorkflowSchema } from "../schema.ts";
 
+const StartedRunSchema = z.object({
+  /** The agent running the workflow. */
+  id: z.string(),
+  displayName: z.string(),
+  description: z.string(),
+  runId: z.string(),
+  jobId: z.string(),
+});
+
 export default {
   name: "Workflow RPC",
   path: "/rpc/workflow",
@@ -96,17 +105,25 @@ export default {
         runs: z.array(WorkflowRunSchema),
       }),
     },
+    /**
+     * Starts a run as a person-started agent job. Whether its agent may ask a person is decided by
+     * the job engine (approval escalation configured or not); a `headless` field sent by older
+     * clients is ignored (stripped).
+     */
     spawnWorkflow: {
       type: "mutation",
       input: z.object({
         name: z.string(),
-        headless: z.boolean().default(false),
       }),
-      result: z.object({
-        id: z.string(),
-        displayName: z.string(),
-        description: z.string(),
+      result: StartedRunSchema,
+    },
+    /** Runs a finished (e.g. interrupted) run's workflow again, linked to it by `rerunOf`. */
+    rerunRun: {
+      type: "mutation",
+      input: z.object({
+        runId: z.string(),
       }),
+      result: StartedRunSchema,
     },
     cancelRun: {
       type: "mutation",

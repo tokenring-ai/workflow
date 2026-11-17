@@ -22,7 +22,9 @@ The package provides chat commands for interactive use, JSON-RPC endpoints for t
 ### Integration Points
 
 - **AgentCommandService**: registers the `/workflow` chat commands
-- **AgentManager**: spawns the workflow agent and validates the workflow's agent type
+- **AgentJobService** (agent plugin): runs every workflow run as an agent job (owner `workflow`): spawning, time
+  limit, lineage, depth/fan-out limits, cancel cascade and agent cleanup
+- **AgentManager**: validates the workflow's agent type
 - **RpcService**: exposes the workflow endpoints to clients
 - **ChatService**: registers the `workflow_*` agent tools
 - **Configuration System**: supplies (and can reconfigure) the workflow directory
@@ -53,7 +55,8 @@ await pluginManager.installPlugins([workflowPlugin]);
 |--------------------------|------------------------------------------------------------------------------|
 | `/workflow list`         | List all available workflows with their names, descriptions, and step counts |
 | `/workflow spawn <name>` | Spawn a new agent and run a workflow on it                                   |
-| `/workflow cancel <runId\|name>` | Cancel an in-flight workflow run by run id or workflow name          |
+| `/workflow rerun <runId>` | Run a finished (e.g. interrupted) run's workflow again                      |
+| `/workflow cancel <runId\|name>` | Cancel an in-flight workflow run, and every run or job it started    |
 
 ### `/workflow list`
 
@@ -69,9 +72,26 @@ When the workflow directory is empty, the command reports the directory it looke
 
 ### `/workflow spawn <name>`
 
-Calls `WorkflowService.spawnWorkflow()`, which creates an agent of the workflow's `agentType` and runs the steps on it in
-the background. Headless mode is inherited from the parent agent, and the command returns as soon as the agent exists —
-progress is followed through `WorkflowState` (see below), not by waiting on the command.
+Calls `WorkflowService.spawnWorkflow(name, { startedBy: agent })`, which starts an agent job of the workflow's
+`agentType` and runs the steps on it in the background. The job's origin is the calling agent, so a `/workflow spawn`
+inside a workflow step is a child job: it counts toward `agent.jobs.maxDepth` / `maxDescendants` and is cancelled with
+its parent. Whether the job's agent may ask a person is decided by the job engine (approval escalation configured or
+not). The command returns as soon as the agent exists — progress is followed through `WorkflowState` (see below).
+
+### Running workflows: jobs, statuses and restarts
+
+- Each step is one `session.run()` of the run's job; the workflow's own `retries` (at most 10) and `onError` apply on top.
+- `subAgent.timeout` (seconds, whole run) is the job's time limit; `0` uses the engine default (`agent.jobs.timeoutSeconds`).
+- A run ends `completed`, `completedWithErrors` (every step ran but some failed under `onError: continue`; the job
+  counts as failed, so its agent is kept an hour for inspection), `failed`, `cancelled`, or `interrupted`.
+- The job deletes its agent when the run succeeds; failed/cancelled runs keep it for an hour.
+- Run records carry `jobId`, `rerunOf` and `costUsd` (read from the job). Step outputs and run messages are capped at
+  4000 characters.
+- A run in flight when the app stops is restored as `interrupted` and never re-run automatically; Run again (UI),
+  `/workflow rerun <runId>` or the `rerunRun` RPC start it again as a new run linked by `rerunOf`.
+- Structured steps are formatted before the run starts. An empty optional positional followed by a later positional
+  (or remainder text the parser would read into it) is written out as its default value, or the run is refused with a
+  validation error, because the command parser fills positionals strictly in order.
 
 ## Tools
 
@@ -83,6 +103,7 @@ Registered with `ChatService` (enable them on an agent type like any other tool)
 | `workflow_get` | no | Reads one workflow in full, including its steps. |
 | `workflow_create` | **yes** | Creates a workflow (`name`, `displayName`, `description?`, `category?`, `agentType`, `steps`). Refuses existing names and unknown agent types before asking. |
 | `workflow_update` | **yes** | Replaces only the fields passed (`steps`, when given, replaces the whole list). Refuses unknown workflows, empty changes and unknown agent types before asking. |
+| `workflow_run` | level 5 (CostlyChange) | Starts a saved workflow by `name` in the background and returns `{ runId, jobId, agentId }`. The run is a child job of the calling agent, so the job depth, fan-out and cancel cascade apply; a limit refusal is reported to the model. |
 
 Write tools show the user the workflow's name, agent type and numbered steps (with `onError`/`retries`) in the
 approval prompt; a declined approval writes nothing and fails the tool call.
@@ -155,8 +176,8 @@ Each step is either a plain string or a structured command object.
 ```yaml
 steps:
   - /tools enable @tokenring-ai/research/research
-  - /chat Research the latest AI developments
-  - /chat Write an article based on the research
+  - Research the latest AI developments
+  - Write an article based on the research
 ```
 
 **Structured command steps** describe a command by name, named arguments, and free-text remainder:
@@ -176,7 +197,7 @@ steps:
 | `arguments`  | `Record<string, string \| number \| boolean>`  | no       | `{}`    | Named `--arg` values and positional values keyed by schema name    |
 | `remainder`  | `string`                                       | no       | `""`    | Free-text trailing input (prompts, messages, etc.)                 |
 | `onError`    | `"stop" \| "continue"`                         | no       | `stop`  | `continue` records the failure and runs the next step              |
-| `retries`    | `number` (integer ≥ 0)                         | no       | `0`     | Re-run a failed step up to this many times before handling the failure |
+| `retries`    | `number` (integer 0–10)                        | no       | `0`     | Re-run a failed step up to this many times before handling the failure |
 
 The Workflows editor exposes `onError` and `retries` on every command step ("On failure" and "Retries", capped at 10
 in the UI); defaults are omitted from the saved YAML. Plain-string steps always use the defaults.
@@ -197,7 +218,7 @@ The `subAgent` field uses `SubAgentConfigSchema` from `@tokenring-ai/agent`:
 | `forwardHumanRequests` | `boolean` | `true`  | Forward human requests from the sub-agent        |
 | `forwardReasoning`     | `boolean` | `false` | Forward reasoning from the sub-agent             |
 | `forwardInputCommands` | `boolean` | `true`  | Forward input commands from the sub-agent        |
-| `timeout`              | `number`  | `0`     | Timeout in milliseconds (0 = no timeout)         |
+| `timeout`              | `number`  | `0`     | Whole-run time limit in seconds (0 = the job engine's default) |
 | `maxResponseLength`    | `number`  | `10000` | Maximum response length from the sub-agent       |
 | `minContextLength`     | `number`  | `1000`  | Minimum context length for the sub-agent         |
 
@@ -234,7 +255,10 @@ Running a workflow spawns an agent of the workflow's agent type and feeds it one
 | `importWorkflow(yaml: string, name?: string): Promise<Workflow>` | Creates a workflow from YAML. `name` overrides the file's `name` key; the body is schema-validated (errors list each issue's path) and an existing or reserved name is refused. |
 | `duplicateWorkflow(workflowName: string, newName?: string): Promise<Workflow>` | Copies a workflow as `newName` or the first free `<name>-copy`, `<name>-copy2`, …, with "(copy)" appended to the display name and no marketplace origin. |
 | `deleteWorkflow(workflowName: string): Promise<boolean>` | Deletes the workflow file, returning `false` when there was nothing to delete. |
-| `spawnWorkflow(workflowName: string, options: { headless: boolean }): Promise<Agent>` | Spawns an agent of the workflow's agent type, registers the run in `WorkflowState`, and starts running steps in the background. Returns as soon as the agent exists. |
+| `spawnWorkflow(workflowName: string, options?: { startedBy?: Agent; personLabel?: string; origin?: { kind: "schedule"; scheduleId: string }; rerunOf?: string }): Promise<{ runId, jobId, agent }>` | Starts the run as an agent job (origin: `startedBy`, else `origin` — a schedule — else a person), registers it in `WorkflowState`, and runs the steps in the background. Throws `LimitError` (recorded as a failed run) when the job limits refuse it. |
+| `rerunRun(runId: string, options?): Promise<{ runId, jobId, agent }>` | Starts a finished run's workflow again, linked by `rerunOf`. |
+| `cancelRun(runId: string): boolean` | Cancels the run's job (and every job it started); `false` when not in flight. |
+| `loadRunHistory(): Promise<void>` | Restores `.runs/*.json` on the persistence queue (before any prune), deduplicated by id; in-flight runs become `interrupted`. |
 | `getRuns(): WorkflowRun[]` | Every tracked run, oldest first, including finished ones. |
 
 `Workflow` is the file body (`WorkflowItem`) plus the `name` taken from the file name and the file's `updatedAt`
@@ -264,7 +288,8 @@ runs are never trimmed.
 |--------|-------------|
 | `constructor(maxFinishedRuns: number)` | Creates the state slice with the given finished-run retention limit. |
 | `serialize(): { runs: WorkflowRun[] }` | Returns a deep copy of all runs for persistence. |
-| `deserialize(data: { runs: WorkflowRun[] }): void` | Restores runs from persisted data. Any run still in flight is recorded as `cancelled` with message `"Interrupted by an application restart"`. |
+| `deserialize(data: { runs: WorkflowRun[] }): void` | Restores runs from persisted data. Any run still in flight is recorded as `interrupted` (never re-run automatically). |
+| `restoreRuns(runs: WorkflowRun[]): void` | Adds runs loaded from disk, skipping ids already in state. |
 | `getRun(runId: string): WorkflowRun \| null` | Returns the run with the given ID, or `null`. |
 | `getRunByAgentId(agentId: string): WorkflowRun \| null` | Returns the run associated with the given agent ID, or `null`. |
 | `addRun(run: NewWorkflowRun): WorkflowRun` | Registers a new run with status `starting`, `currentStep` 0, and `agentId` `null`. Trims finished runs. |
@@ -284,7 +309,10 @@ Each run holds:
 | `agentId`       | `string \| null`     | Agent ID, or `null` until the agent has been created.                       |
 | `steps`         | `WorkflowStep[]`     | Steps snapshotted when the run started; later edits to the file don't affect it. |
 | `currentStep`   | `number`             | Index of the step being executed; equals `steps.length` once completed.     |
-| `status`        | `WorkflowRunStatus`  | One of `starting`, `running`, `completed`, `failed`, or `cancelled`.        |
+| `jobId`         | `string \| null`     | The agent job running it (`null` for runs from older versions or refused before starting). |
+| `rerunOf`       | `string \| null`     | The run this one runs again.                                                |
+| `costUsd`       | `number \| null`     | The job agent's spend, read from the job when the run ended.                |
+| `status`        | `WorkflowRunStatus`  | `starting`, `running`, `completed`, `completedWithErrors`, `failed`, `cancelled`, or `interrupted`. |
 | `message`       | `string`             | Last step response, or the reason the run ended.                            |
 | `startedAt`     | `number`             | Epoch milliseconds when the run was registered.                             |
 | `finishedAt`    | `number \| null`     | Epoch milliseconds when the run ended, or `null` while in flight.           |
@@ -321,9 +349,9 @@ This plugin is service-only (no agent lifecycle hooks).
 
 **`install(app)`:**
 
-1. Waits for `AgentCommandService` and registers the `/workflow list` and `/workflow spawn` commands.
+1. Waits for `AgentCommandService` and registers the `/workflow list`, `spawn`, `rerun` and `cancel` commands.
 2. Creates and adds a `WorkflowService` instance via `app.addService(new WorkflowService(app))`.
-3. Waits for `ChatService` and registers the `workflow_list`, `workflow_get`, `workflow_create` and `workflow_update` tools.
+3. Waits for `ChatService` and registers the `workflow_list`, `workflow_get`, `workflow_create`, `workflow_update` and `workflow_run` tools.
 4. Waits for `RpcService` and registers the `/rpc/workflow` endpoint.
 
 **`reconfigure(app, config)`:**
@@ -347,7 +375,9 @@ Registered under `/rpc/workflow`:
 | `exportWorkflow`       | `query`   | Returns `{ fileName, yaml }` for downloading the workflow named `name`. |
 | `importWorkflow`       | `mutation`| Creates a workflow from `{ yaml, name? }` (validated; existing names refused); returns `{ workflow }`. |
 | `deleteWorkflow`       | `mutation`| Deletes a workflow by `name`; returns `{ success: boolean }`.            |
-| `spawnWorkflow`        | `mutation`| Spawns a workflow from `{ name, headless? }` (headless defaults to `false`); returns `{ id, displayName, description }`. |
+| `spawnWorkflow`        | `mutation`| Starts a person-started run from `{ name }` (a `headless` field from older clients is ignored); returns `{ id (agent), displayName, description, runId, jobId }`. |
+| `rerunRun`             | `mutation`| Runs a finished run `{ runId }` again; same result as `spawnWorkflow`. |
+| `cancelRun`            | `mutation`| Cancels `{ runId }` and the jobs it started; returns `{ success }`. |
 | `streamWorkflowRuns`   | `stream`  | State subscription stream that yields `{ status, runs }` on every state change. |
 
 Each workflow object is `{ name, displayName, category, description, agentType, steps, subAgent, updatedAt }`.
@@ -401,7 +431,7 @@ bun test --coverage   # with coverage
 - `frontend/views/workflows.test.tsx` covers the dashboard views, including import (collision blocking, server errors),
   duplicate, download, and editing a step's failure handling and retries.
 - `commands/workflow.test.ts` covers the chat commands against a temporary workflow directory, including listing
-  workflows, spawning agents, inheriting headless mode, and erroring on non-existent workflows.
+  workflows, starting runs from the calling agent, re-running runs, and erroring on non-existent workflows.
 - `formatWorkflowStep.test.ts` covers step formatting: plain string pass-through, flag and named-arg emission,
   positional emission, quoting values with spaces, omitting false flags and empty values, and label formatting without
   a live command registry.
@@ -418,12 +448,14 @@ plugin/workflow/
 ├── formatWorkflowStep.ts         # Step-to-agent-input formatting utilities
 ├── formatWorkflowStep.test.ts    # Formatting unit tests
 ├── tools.ts                      # Agent tool registry
-├── tools/                        # workflow_list / workflow_get / workflow_create / workflow_update
+├── tools/                        # workflow_list / workflow_get / workflow_create / workflow_update / workflow_run
 ├── commands.ts                   # Command registry
 ├── commands/
 │   ├── workflow/
 │   │   ├── list.ts               # /workflow list
-│   │   └── spawn.ts              # /workflow spawn
+│   │   ├── spawn.ts              # /workflow spawn
+│   │   ├── rerun.ts              # /workflow rerun
+│   │   └── cancel.ts             # /workflow cancel
 │   └── workflow.test.ts          # Command unit tests
 ├── state/
 │   └── workflowState.ts          # App-level state slice tracking every run

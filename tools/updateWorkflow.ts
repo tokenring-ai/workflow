@@ -32,6 +32,17 @@ async function execute(input: z.output<typeof inputSchema>, agent: Agent): Promi
   });
   if (!approved) throw new ToolCallError(name, "The user did not approve updating the workflow.");
 
+  // The approval can stay open a while. If the workflow was saved in the meantime (the editor, another
+  // agent), writing `item` — built from the old version — would silently undo that save.
+  const latest = await service.getWorkflow(workflowName);
+  if (!latest) throw new ToolCallError(name, `Workflow "${workflowName}" was deleted while waiting for approval; nothing was changed.`);
+  if (latest.updatedAt !== existing.updatedAt) {
+    throw new ToolCallError(
+      name,
+      `Workflow "${workflowName}" was changed by someone else while waiting for approval; nothing was changed. Read it again with workflow_get and redo the update.`,
+    );
+  }
+
   const workflow = await service.updateWorkflow(workflowName, item);
   return {
     message: `**Workflow** Updated ${workflowName}`,

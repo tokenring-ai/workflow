@@ -1,3 +1,4 @@
+import { JobLink } from "@tokenring-ai/one-frontend/apps/agents/JobLink.tsx";
 import BusySpinner from "@tokenring-ai/one-frontend/components/ui/BusySpinner.tsx";
 import ConfirmModal from "@tokenring-ai/one-frontend/components/ui/ConfirmModal.tsx";
 import HistoryRunRow, { type HistoryRunStatus } from "@tokenring-ai/one-frontend/components/ui/HistoryRunRow.tsx";
@@ -7,7 +8,7 @@ import { runOrConfirm } from "@tokenring-ai/one-frontend/lib/uiPreferences.ts";
 import { cn } from "@tokenring-ai/one-frontend/lib/utils.ts";
 import { formatDurationMs } from "@tokenring-ai/utility/date/formatDuration";
 import type { WorkflowRun, WorkflowRunStatus } from "@tokenring-ai/workflow/schema";
-import { CheckCircle2, Circle, ExternalLink, History, Loader2, OctagonX, RotateCcw, X, XCircle } from "lucide-react";
+import { CheckCircle2, Circle, CirclePause, ExternalLink, History, Loader2, OctagonX, RotateCcw, TriangleAlert, X, XCircle } from "lucide-react";
 import { useState } from "react";
 
 export function isRunActive(run: WorkflowRun): boolean {
@@ -15,7 +16,7 @@ export function isRunActive(run: WorkflowRun): boolean {
 }
 
 export function isRunFinished(run: WorkflowRun): boolean {
-  return run.status === "completed" || run.status === "failed" || run.status === "cancelled";
+  return !isRunActive(run);
 }
 
 /** Newest first; keeps active runs at the top, then finished by finish/start time. */
@@ -113,6 +114,11 @@ const RUN_STATUS_BADGES: Record<WorkflowRunStatus, StatusBadgeDefinition> = {
     icon: <CheckCircle2 className="w-3 h-3" />,
     colorClass: "text-success",
   },
+  completedWithErrors: {
+    label: "Completed with errors",
+    icon: <TriangleAlert className="w-3 h-3" />,
+    colorClass: "text-warning",
+  },
   failed: {
     label: "Failed",
     icon: <XCircle className="w-3 h-3" />,
@@ -122,6 +128,11 @@ const RUN_STATUS_BADGES: Record<WorkflowRunStatus, StatusBadgeDefinition> = {
     label: "Cancelled",
     icon: <X className="w-3 h-3" />,
     colorClass: "text-muted",
+  },
+  interrupted: {
+    label: "Interrupted",
+    icon: <CirclePause className="w-3 h-3" />,
+    colorClass: "text-warning",
   },
 };
 
@@ -142,7 +153,7 @@ export function ActiveRunPanel({
   onOpenAgent: (id: string) => void;
   onCancel: (run: WorkflowRun) => void;
   cancelling: boolean;
-  /** Offered once the run has finished: launches the same workflow again. */
+  /** Offered once the run has finished (an interrupted run is never re-run on its own): starts the same workflow again. */
   onRerun?: (run: WorkflowRun) => void;
   rerunning?: boolean;
 }) {
@@ -171,7 +182,9 @@ export function ActiveRunPanel({
             ? "border-success bg-success/10"
             : run.status === "failed"
               ? "border-error bg-error/10"
-              : "border-primary bg-secondary/40"
+              : run.status === "completedWithErrors" || run.status === "interrupted"
+                ? "border-warning bg-warning-subtle"
+                : "border-primary bg-secondary/40"
       }`}
     >
       <div className="flex items-center gap-2 px-3 py-2.5 border-b border-primary/50">
@@ -198,17 +211,22 @@ export function ActiveRunPanel({
             type="button"
             onClick={() => onRerun(run)}
             disabled={rerunning}
-            title="Launch this workflow again on a new agent"
+            title={
+              run.status === "interrupted"
+                ? "The app stopped during this run; start the workflow again on a new agent"
+                : "Run this workflow again on a new agent"
+            }
             className="flex items-center gap-1 px-2 py-1 text-xs font-medium text-muted hover:text-primary hover:bg-hover rounded-lg transition-colors cursor-pointer focus-ring disabled:opacity-50 shrink-0"
           >
-            {rerunning ? <Loader2 className="w-3 h-3 animate-spin" /> : <RotateCcw className="w-3 h-3" />} Re-run
+            {rerunning ? <Loader2 className="w-3 h-3 animate-spin" /> : <RotateCcw className="w-3 h-3" />} Run again
           </button>
         )}
+        {run.jobId && <JobLink jobId={run.jobId} className="shrink-0 px-1" />}
         {run.agentId && (
           <button
             type="button"
             onClick={() => onOpenAgent(run.agentId!)}
-            className="flex items-center gap-1 px-2 py-1 text-xs font-medium text-cyan-700 dark:text-cyan-400 hover:bg-cyan-500/10 rounded-lg transition-colors cursor-pointer focus-ring shrink-0"
+            className="flex items-center gap-1 px-2 py-1 text-xs font-medium text-accent hover:bg-accent-muted rounded-lg transition-colors cursor-pointer focus-ring shrink-0"
           >
             <ExternalLink className="w-3 h-3" /> Open agent
           </button>
@@ -223,12 +241,12 @@ export function ActiveRunPanel({
             state = record.status === "running" ? "current" : record.status;
           } else if (run.status === "starting") {
             state = "pending";
-          } else if (run.status === "completed" || index < run.currentStep) {
+          } else if (run.status === "completed" || run.status === "completedWithErrors" || index < run.currentStep) {
             state = "done";
           } else if (isRunActive(run) && index === run.currentStep) {
             state = "current";
           } else if (isRunFinished(run) && index === run.currentStep) {
-            state = run.status === "cancelled" ? "cancelled" : "failed";
+            state = run.status === "cancelled" || run.status === "interrupted" ? "cancelled" : "failed";
           }
 
           const output = record?.output.trim() ?? "";
@@ -273,7 +291,7 @@ export function ActiveRunPanel({
       {confirmingCancel && (
         <ConfirmModal
           title="Cancel workflow run?"
-          message={`This stops "${runTitle(run)}" mid-step and deletes the agent running it. Finished steps stay done; the rest will not run.`}
+          message={`This stops "${runTitle(run)}" mid-step, along with any workflows or jobs it started. Finished steps stay done; the rest will not run. Its agent is kept for an hour so you can read what it did.`}
           confirmLabel="Cancel run"
           cancelLabel="Keep running"
           variant="warning"
@@ -294,12 +312,15 @@ export function WorkflowRunHistory({
   runs,
   emptyMessage,
   onOpenAgent,
+  agentLabel,
   className,
 }: {
   runs: WorkflowRun[];
   /** Shown only when `runs` is empty. Pass null to render nothing in that case. */
   emptyMessage: string | null;
   onOpenAgent: (id: string) => void;
+  /** Display name for a run's agent type id. */
+  agentLabel?: (type: string) => string;
   className?: string;
 }) {
   if (runs.length === 0) {
@@ -316,7 +337,7 @@ export function WorkflowRunHistory({
     <div
       role="region"
       aria-label="Workflow run history"
-      className={cn("border border-primary rounded-xl bg-secondary/40 overflow-y-auto divide-y divide-primary/60", className)}
+      className={cn("border border-primary rounded-xl bg-secondary/40 divide-y divide-primary/60", className)}
     >
       {runs.map(run => {
         const when = run.finishedAt ?? run.startedAt;
@@ -340,7 +361,7 @@ export function WorkflowRunHistory({
                 <button
                   type="button"
                   onClick={() => onOpenAgent(run.agentId!)}
-                  className="p-1 text-muted hover:text-cyan-600 dark:hover:text-cyan-400 rounded transition-colors cursor-pointer focus-ring shrink-0"
+                  className="p-1 text-muted hover:text-accent rounded transition-colors cursor-pointer focus-ring shrink-0"
                   title="Open agent"
                   aria-label="Open agent for this run"
                 >
@@ -349,6 +370,12 @@ export function WorkflowRunHistory({
               ) : undefined
             }
           >
+            {agentLabel || run.jobId ? (
+              <p className="flex items-center gap-2 text-xs text-muted">
+                {agentLabel ? <span className="truncate">{agentLabel(run.agentType)}</span> : null}
+                {run.jobId ? <JobLink jobId={run.jobId} className="shrink-0" /> : null}
+              </p>
+            ) : null}
             {isRunActive(run) && run.steps.length > 0 ? (
               <p className="text-xs text-muted truncate">
                 {run.status === "starting"

@@ -66,8 +66,8 @@ export default function SubAgentSettingsEditor({ value, onChange }: { value: Sub
               const hintId = `sub-agent-hint-${field.key}`;
               return (
                 <div key={field.key} className="space-y-1">
-                  <label className="text-xs font-semibold text-muted uppercase tracking-wide" htmlFor={`sub-agent-${field.key}`}>
-                    {field.label} <span className="font-normal lowercase tracking-normal">({field.unit})</span>
+                  <label className="text-xs font-medium text-muted" htmlFor={`sub-agent-${field.key}`}>
+                    {field.label} <span className="font-normal">({field.unit})</span>
                   </label>
                   <input
                     id={`sub-agent-${field.key}`}
@@ -81,7 +81,7 @@ export default function SubAgentSettingsEditor({ value, onChange }: { value: Sub
                       onChange({ ...value, [field.key]: Math.max(0, parsed) });
                     }}
                     aria-describedby={hintId}
-                    className="w-full bg-input border border-primary rounded-lg px-3 py-2 text-xs text-primary focus-accent"
+                    className="w-full bg-input border border-primary rounded-lg px-3 py-2 text-sm text-primary focus-accent"
                   />
                   <span id={hintId} className="block text-xs text-muted">
                     {field.hint}

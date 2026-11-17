@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, mock } from "bun:test";
-import { screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { defineView } from "@tokenring-ai/one-frontend/layout/define.ts";
 import type { ViewParams } from "@tokenring-ai/one-frontend/layout/types.ts";
@@ -42,7 +42,8 @@ type SaveArgs = { name: string; workflow: Omit<typeof bugHunter, "name" | "updat
 const createWorkflow = mock(async (_args: SaveArgs) => ({ workflow: bugHunter }));
 const updateWorkflow = mock(async (_args: SaveArgs) => ({ workflow: bugHunter }));
 const deleteWorkflow = mock(async (_args: { name: string }) => ({ success: true }));
-const spawnWorkflow = mock(async (_args: { name: string; headless: boolean }) => ({ id: "agent-1", displayName: "Leader", description: "" }));
+const spawnWorkflow = mock(async (_args: { name: string }) => ({ id: "agent-1", displayName: "Leader", description: "", runId: "run-new", jobId: "job-1" }));
+const rerunRun = mock(async (_args: { runId: string }) => ({ id: "agent-2", displayName: "Leader", description: "", runId: "run-2", jobId: "job-2" }));
 const cancelRun = mock(async (_args: { runId: string }) => ({ success: true }));
 const getWorkflow = mock(async (_args: { name: string }) => ({ workflow: bugHunter }));
 const mutateWorkflows = mock(async () => undefined);
@@ -60,6 +61,7 @@ const activeRun: { agentId: string | null; status: string; [key: string]: unknow
   displayName: "All-Package Bug Hunter",
   agentType: "leader",
   agentId: "agent-1",
+  jobId: "job-1",
   steps: bugHunter.steps,
   currentStep: 1,
   status: "running",
@@ -69,7 +71,27 @@ const activeRun: { agentId: string | null; status: string; [key: string]: unknow
 };
 
 let workflowRuns: (typeof activeRun)[] = [];
+const rollupRow = (key: string, runs: number, failed: number) => ({
+  key,
+  label: key,
+  runs,
+  active: 0,
+  succeeded: runs - failed,
+  failed,
+  interrupted: 0,
+  cancelled: 0,
+  refusedActions: 0,
+  totalCostUsd: 0.5 * runs,
+  costUnavailableJobs: 0,
+  averageDurationMs: 1000,
+  lastRunAt: 1_700_000_000_000,
+  lastStatus: failed ? "failed" : "succeeded",
+});
+let rollupData: { days: number; rows: ReturnType<typeof rollupRow>[]; totals: ReturnType<typeof rollupRow>; truncated: boolean } | undefined;
+const rollupCalls: { days: number; groupBy: string }[] = [];
 let workflowList: (typeof bugHunter)[] = [bugHunter];
+/** Set to make the workflow list fail to load. */
+let workflowsError: Error | undefined;
 
 const sampleCommands = [
   { name: "chat", description: "Send a chat message", inputSchema: { remainder: { name: "message", description: "Message to send", required: true } } },
@@ -125,7 +147,10 @@ const marketplaceItemData: Record<string, unknown> = {
 };
 
 void mock.module("@tokenring-ai/one-frontend/rpc.ts", () => ({
-  useWorkflows: () => ({ data: workflowList, isLoading: false, mutate: mutateWorkflows }),
+  useWorkflows: () =>
+    workflowsError
+      ? { data: undefined, error: workflowsError, isLoading: false, mutate: mutateWorkflows }
+      : { data: workflowList, isLoading: false, mutate: mutateWorkflows },
   useMarketplaceItems: (enabled: boolean) => ({
     data: enabled ? marketplaceListData : undefined,
     isLoading: false,
@@ -140,6 +165,10 @@ void mock.module("@tokenring-ai/one-frontend/rpc.ts", () => ({
   }),
   marketplaceRPCClient: { installMarketplaceItem, listMarketplaceItems: mock(async () => marketplaceListData) },
   useWorkflowRuns: () => ({ data: { status: "success", runs: workflowRuns }, isLoading: false }),
+  useJobRollup: (options: { days: number; groupBy: string }) => {
+    rollupCalls.push(options);
+    return { data: rollupData, isLoading: false, error: undefined, mutate: mock(async () => undefined) };
+  },
   useAgentList: () => ({ data: [], isLoading: false, mutate: mock() }),
   useAgentTypes: () => ({ data: [{ type: "leader", displayName: "Leader", description: "", category: "General", enabledTools: [] }], isLoading: false }),
   useAvailableCommands: () => ({ data: sampleCommands, isLoading: false }),
@@ -149,6 +178,7 @@ void mock.module("@tokenring-ai/one-frontend/rpc.ts", () => ({
     updateWorkflow,
     deleteWorkflow,
     spawnWorkflow,
+    rerunRun,
     cancelRun,
     getWorkflow,
     exportWorkflow,
@@ -224,6 +254,7 @@ describe("Workflows app", () => {
       updateWorkflow,
       deleteWorkflow,
       spawnWorkflow,
+      rerunRun,
       cancelRun,
       installMarketplaceItem,
       exportWorkflow,
@@ -234,6 +265,9 @@ describe("Workflows app", () => {
       fn.mockClear();
     workflowRuns = [];
     workflowList = [bugHunter];
+    workflowsError = undefined;
+    rollupData = undefined;
+    rollupCalls.length = 0;
   });
 
   describe("library", () => {
@@ -252,12 +286,30 @@ describe("Workflows app", () => {
       expect(panelOpen("workflows-overview:_")).toBe(false);
     });
 
+    it("shows spend and outcomes per workflow on the Runs page; picking one opens it", async () => {
+      const user = userEvent.setup();
+      workflowRuns = [activeRun];
+      rollupData = { days: 7, rows: [rollupRow("bugHunter", 4, 1)], totals: rollupRow("total", 4, 1), truncated: false };
+      renderWorkflowsApp();
+
+      const region = within(await screen.findByRole("region", { name: "Workflow spend and outcomes" }));
+      expect(rollupCalls.at(-1)).toEqual({ days: 7, groupBy: "workflow" });
+      const rows = within(region.getByRole("list", { name: "Workflows" })).getAllByRole("listitem");
+      expect(rows.map(row => row.getAttribute("data-workflow"))).toEqual(["bugHunter", null]);
+      expect(rows[0]).toHaveTextContent("4 runs");
+      expect(rows[0]).toHaveTextContent("1 failed");
+      expect(rows[1]).toHaveTextContent("Total");
+
+      await user.click(region.getByRole("button", { name: "bugHunter" }));
+      await waitFor(() => expect(pathname()).toBe("/workflows/bugHunter"));
+    });
+
     it("runs a workflow from the sidebar without selecting it first", async () => {
       const user = userEvent.setup();
       renderWorkflowsApp();
 
-      await user.click(await screen.findByRole("button", { name: "Run All-Package Bug Hunter" }));
-      await waitFor(() => expect(spawnWorkflow).toHaveBeenCalledWith({ name: "bugHunter", headless: false }));
+      await user.click(await inPanel("workflow-library:_").findByRole("button", { name: "Run All-Package Bug Hunter" }));
+      await waitFor(() => expect(spawnWorkflow).toHaveBeenCalledWith({ name: "bugHunter" }));
       // The workflow opens so the new run shows up in its editor.
       await waitFor(() => expect(pathname()).toBe("/workflows/bugHunter"));
     });
@@ -277,7 +329,8 @@ describe("Workflows app", () => {
       const user = userEvent.setup();
       renderWorkflowsApp();
 
-      await user.click(await screen.findByRole("button", { name: "Duplicate All-Package Bug Hunter" }));
+      await user.click(await screen.findByRole("button", { name: "More actions for All-Package Bug Hunter" }));
+      await user.click(await screen.findByRole("menuitem", { name: "Duplicate" }));
       await waitFor(() => expect(duplicateWorkflow).toHaveBeenCalledWith({ name: "bugHunter" }));
       await waitFor(() => expect(pathname()).toBe("/workflows/bugHunter-copy"));
     });
@@ -335,6 +388,48 @@ describe("Workflows app", () => {
       expect(overview.queryByRole("button", { name: /^Launch / })).toBeNull();
     });
 
+    it("offers to start a workflow from the landing page, most recently run first", async () => {
+      const user = userEvent.setup();
+      const other = { ...bugHunter, name: "docsWriter", displayName: "Docs Writer" };
+      workflowList = [other, bugHunter];
+      workflowRuns = [{ ...activeRun, status: "completed", agentId: null, finishedAt: 1_700_000_100_000 }];
+      renderWorkflowsView("workflows-overview");
+
+      const start = within(await screen.findByRole("region", { name: "Start a workflow" }));
+      const names = start.getAllByRole("listitem").map(item => item.textContent);
+      expect(names[0]).toContain("All-Package Bug Hunter");
+      expect(names[1]).toContain("Docs Writer");
+
+      await user.click(start.getByRole("button", { name: "Run All-Package Bug Hunter" }));
+      await waitFor(() => expect(spawnWorkflow).toHaveBeenCalledWith({ name: "bugHunter" }));
+    });
+
+    it("falls back to the library and one compact empty state when nothing has run", async () => {
+      const user = userEvent.setup();
+      renderWorkflowsView("workflows-overview");
+
+      const start = within(await screen.findByRole("region", { name: "Start a workflow" }));
+      expect(screen.getByText("No runs yet.")).toBeInTheDocument();
+      expect(screen.queryByText("Nothing is running.")).toBeNull();
+      expect(screen.queryByRole("region", { name: "Running" })).toBeNull();
+      expect(screen.queryByText(/press ▶/)).toBeNull();
+      await user.click(start.getByRole("button", { name: "Open All-Package Bug Hunter" }));
+      await waitFor(() => expect(pathname()).toBe("/test/bugHunter"));
+    });
+
+    it("shows agent display names, not ids, in recent runs", async () => {
+      workflowRuns = [{ ...activeRun, status: "completed", agentId: null, finishedAt: 1_700_000_100_000 }];
+      renderWorkflowsView("workflows-overview");
+      expect(await screen.findByText(/^Leader · /)).toBeInTheDocument();
+    });
+
+    it("says so, with a retry, when the workflow list fails to load", async () => {
+      workflowsError = new Error("disk unreadable");
+      renderWorkflowsView("workflows-overview");
+      expect(await screen.findByText("Unable to load workflows")).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: /Retry/ })).toBeInTheDocument();
+    });
+
     it("opens a run from the overview", async () => {
       const user = userEvent.setup();
       workflowRuns = [activeRun];
@@ -348,7 +443,7 @@ describe("Workflows app", () => {
       renderWorkflowsView("workflows-overview");
       expect(await screen.findByText("No workflows yet")).toBeInTheDocument();
       expect(screen.getByText("/project/.tokenring/workflows")).toBeInTheDocument();
-      expect(screen.getByText(/Launching one starts a new agent/)).toBeInTheDocument();
+      expect(screen.getByText(/Running one starts a new agent/)).toBeInTheDocument();
       expect(screen.getByRole("button", { name: /Browse the marketplace/ })).toBeInTheDocument();
     });
   });
@@ -357,7 +452,7 @@ describe("Workflows app", () => {
     it("shows a workflow's steps and settings", async () => {
       renderWorkflowsView("workflow-editor", { name: "bugHunter" });
 
-      expect((await screen.findAllByText("bugHunter.yaml")).length).toBeGreaterThan(0);
+      expect(await screen.findByDisplayValue("bugHunter.yaml")).toBeDisabled();
       expect(screen.getByDisplayValue("Finds and fixes bugs")).toBeInTheDocument();
       expect(screen.getByLabelText("Step 1 chat message")).toHaveValue("List all packages in the monorepo");
       expect(screen.getByLabelText("Step 2 command")).toHaveValue("agent run");
@@ -428,6 +523,33 @@ describe("Workflows app", () => {
       expect(updateWorkflow.mock.calls[0]![0].workflow).toMatchObject({ description: "Finds and fixes bugs!", installedFrom });
     });
 
+    it("Cmd+S obeys the same checks as the Save button", async () => {
+      const user = userEvent.setup();
+      renderWorkflowsView("workflow-editor", { name: "bugHunter" });
+
+      const displayName = await screen.findByLabelText(/Display name/);
+      await user.clear(displayName);
+      expect(screen.getByRole("button", { name: "Save" })).toBeDisabled();
+      // As a key event: user.keyboard would also type the "s" into the field.
+      fireEvent.keyDown(displayName, { key: "s", metaKey: true });
+      fireEvent.keyDown(displayName, { key: "s", ctrlKey: true });
+      expect(updateWorkflow).not.toHaveBeenCalled();
+    });
+
+    it("rewrites the YAML on screen when unsaved changes are reverted", async () => {
+      const user = userEvent.setup();
+      renderWorkflowsView("workflow-editor", { name: "bugHunter" });
+
+      await user.click(await screen.findByRole("button", { name: /YAML/ }));
+      const yaml = screen.getByLabelText("Workflow YAML editor") as HTMLTextAreaElement;
+      const saved = yaml.value;
+      fireEvent.change(yaml, { target: { value: saved.replace("Finds and fixes bugs", "Edited in YAML") } });
+      expect(yaml.value).toContain("Edited in YAML");
+
+      await chooseAction(user, "Revert unsaved changes");
+      await waitFor(() => expect((screen.getByLabelText("Workflow YAML editor") as HTMLTextAreaElement).value).toBe(saved));
+    });
+
     it("badges the tab while there are unsaved edits and clears it on save", async () => {
       const user = userEvent.setup();
       renderWorkflowsView("workflow-editor", { name: "bugHunter" });
@@ -492,7 +614,8 @@ describe("Workflows app", () => {
       workflowRuns = [activeRun];
       renderWorkflowsView("workflow-editor", { name: "bugHunter" });
 
-      expect(await screen.findByText(/running step 2 of 2/)).toBeInTheDocument();
+      expect(await screen.findByText(/Running step 2 of 2/)).toBeInTheDocument();
+      expect(screen.getAllByRole("link", { name: "Open agent job job-1" })[0]!.getAttribute("href")).toBe("/agents/jobs?job=job-1");
 
       await user.click(screen.getByRole("button", { name: /Cancel/ }));
       expect(cancelRun).not.toHaveBeenCalled();
@@ -503,15 +626,48 @@ describe("Workflows app", () => {
       await waitFor(() => expect(panelOpen("chat:agent-1")).toBe(true));
     });
 
-    it("runs the workflow attended or headless", async () => {
+    it("runs the workflow; the job engine, not the UI, decides whether its agent may ask", async () => {
       const user = userEvent.setup();
       renderWorkflowsView("workflow-editor", { name: "bugHunter" });
 
-      await chooseAction(user, "Run headless (never asks you)");
-      await waitFor(() => expect(spawnWorkflow).toHaveBeenCalledWith({ name: "bugHunter", headless: true }));
-      await waitFor(() => expect(screen.getByRole("button", { name: "Run" })).not.toBeDisabled());
+      await user.click(await screen.findByRole("button", { name: "Run" }));
+      await waitFor(() => expect(spawnWorkflow).toHaveBeenLastCalledWith({ name: "bugHunter" }));
+      await user.click(screen.getByRole("button", { name: "More workflow actions" }));
+      expect(screen.queryByText(/never asks you/i)).toBeNull();
+    });
+
+    it("says Run starts the saved version while there are unsaved edits", async () => {
+      const user = userEvent.setup();
+      renderWorkflowsView("workflow-editor", { name: "bugHunter" });
+      expect(await screen.findByRole("button", { name: "Run" })).toHaveAttribute("title", expect.stringContaining("new agent"));
+
+      const description = await screen.findByDisplayValue("Finds and fixes bugs");
+      await user.type(description, "!");
+      expect(screen.getByRole("button", { name: "Run" })).toHaveAttribute("title", "Runs the saved version — save first");
+      expect(screen.getByRole("button", { name: "Save" })).toBeEnabled();
+
       await user.click(screen.getByRole("button", { name: "Run" }));
-      await waitFor(() => expect(spawnWorkflow).toHaveBeenLastCalledWith({ name: "bugHunter", headless: false }));
+      await waitFor(() => expect(spawnWorkflow).toHaveBeenCalledWith({ name: "bugHunter" }));
+      expect(updateWorkflow).not.toHaveBeenCalled();
+    });
+
+    it("summarises the last run on one line, with history behind a disclosure", async () => {
+      const user = userEvent.setup();
+      const finished = (id: string, status: string, at: number) => ({ ...activeRun, id, status, agentId: null, finishedAt: at });
+      workflowRuns = [
+        finished("run-3", "cancelled", 1_700_000_300_000),
+        finished("run-2", "completed", 1_700_000_200_000),
+        finished("run-1", "failed", 1_700_000_100_000),
+      ];
+      renderWorkflowsView("workflow-editor", { name: "bugHunter" });
+
+      expect(await screen.findByText(/Last run:/)).toHaveTextContent(/Last run: cancelled/);
+      expect(screen.queryByRole("region", { name: "Workflow run history" })).toBeNull();
+      await user.click(screen.getByRole("button", { name: /History \(3\)/ }));
+      expect(screen.getByRole("region", { name: "Workflow run history" })).toBeInTheDocument();
+
+      await user.click(screen.getByRole("button", { name: "Open" }));
+      await waitFor(() => expect(pathname()).toBe("/test/runs/run-3"));
     });
 
     it("shows a not-found state for a workflow that no longer exists", async () => {
@@ -539,6 +695,18 @@ describe("Workflows app", () => {
       await waitFor(() => expect(panelOpen("workflow-create:_")).toBe(false));
       expect(panelOpen("workflow-editor:greeter")).toBe(true);
       expect(pathname()).toBe("/test/greeter");
+    });
+  });
+
+  describe("create shortcut", () => {
+    it("Cmd+S does not create a workflow that is missing its agent type and steps", async () => {
+      const user = userEvent.setup();
+      renderWorkflowsView("workflow-create");
+
+      const nameInput = await screen.findByLabelText(/^Name/);
+      await user.type(nameInput, "greeter");
+      fireEvent.keyDown(nameInput, { key: "s", metaKey: true });
+      expect(createWorkflow).not.toHaveBeenCalled();
     });
   });
 
@@ -665,8 +833,24 @@ describe("Workflows app", () => {
       expect(within(steps[1]!).getByText(/^Took 3/)).toBeInTheDocument();
       expect(inPanel("workflow-run-detail:run-1").queryByRole("button", { name: /Cancel/ })).toBeNull();
 
-      await user.click(inPanel("workflow-run-detail:run-1").getByRole("button", { name: /Re-run/ }));
-      await waitFor(() => expect(spawnWorkflow).toHaveBeenCalledWith({ name: "bugHunter", headless: false }));
+      await user.click(inPanel("workflow-run-detail:run-1").getByRole("button", { name: /Run again/ }));
+      await waitFor(() => expect(rerunRun).toHaveBeenCalledWith({ runId: "run-1" }));
+      await waitFor(() => expect(pathname()).toBe("/workflows/runs/run-2"));
+    });
+
+    it("offers Run again for a run interrupted by a restart, and shows completed-with-errors runs as such", async () => {
+      const user = userEvent.setup();
+      workflowRuns = [{ ...activeRun, status: "interrupted", message: "Interrupted by an application restart.", agentId: null, finishedAt: 1_700_000_100_000 }];
+      const { unmount } = renderWorkflowsApp("/workflows/runs/run-1");
+      const detail = inPanel("workflow-run-detail:run-1");
+      expect((await detail.findAllByText("Interrupted")).length).toBeGreaterThan(0);
+      await user.click(detail.getByRole("button", { name: /Run again/ }));
+      await waitFor(() => expect(rerunRun).toHaveBeenCalledWith({ runId: "run-1" }));
+      unmount();
+
+      workflowRuns = [{ ...activeRun, status: "completedWithErrors", message: "1 failed step", agentId: null, finishedAt: 1_700_000_100_000 }];
+      renderWorkflowsApp("/workflows/runs/run-1");
+      expect((await inPanel("workflow-run-detail:run-1").findAllByText("Completed with errors")).length).toBeGreaterThan(0);
     });
 
     it("does not offer a re-run while the run is still going", async () => {
@@ -674,7 +858,7 @@ describe("Workflows app", () => {
       renderWorkflowsApp("/workflows/runs/run-1");
       const detail = inPanel("workflow-run-detail:run-1");
       expect(await detail.findByText(/Step 2 of 2/)).toBeInTheDocument();
-      expect(detail.queryByRole("button", { name: /Re-run/ })).toBeNull();
+      expect(detail.queryByRole("button", { name: /Run again/ })).toBeNull();
     });
 
     it("shows a not-found state for an unknown run", async () => {
@@ -687,7 +871,7 @@ describe("Workflows app", () => {
     it("sends Browse marketplace to the Marketplace app", async () => {
       const user = userEvent.setup();
       renderWorkflowsApp("/workflows");
-      await user.click(await screen.findByRole("button", { name: "Browse marketplace" }));
+      await user.click(await screen.findByRole("button", { name: "Find workflows in the Marketplace" }));
       expect(pathname()).toBe("/marketplace/workflow");
     });
   });
@@ -710,7 +894,6 @@ describe("Workflows app", () => {
         label: "Workflows",
         group: "Build",
         shortLabel: "WF",
-        defaultPinned: true,
         gradient: "from-cyan-500 to-teal-600",
       });
       expect(layout.apps[0]!.views).toContain("chat");
@@ -726,7 +909,7 @@ describe("Workflows app", () => {
 
     it("opens the workflow named by the URL beside the library", async () => {
       renderWorkflowsApp("/workflows/bugHunter");
-      expect((await screen.findAllByText("bugHunter.yaml")).length).toBeGreaterThan(0);
+      expect(await screen.findByDisplayValue("bugHunter.yaml")).toBeDisabled();
       expect(panelOpen("workflow-library:_")).toBe(true);
       expect(panelOpen("workflow-editor:bugHunter")).toBe(true);
     });

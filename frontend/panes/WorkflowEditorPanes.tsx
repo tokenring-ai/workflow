@@ -6,7 +6,6 @@ import LoadingState from "@tokenring-ai/one-frontend/components/ui/LoadingState.
 import { toastManager } from "@tokenring-ai/one-frontend/components/ui/toast.tsx";
 import ViewShell from "@tokenring-ai/one-frontend/components/ui/ViewShell.tsx";
 import { useEntityDelete } from "@tokenring-ai/one-frontend/hooks/useEntityDelete.ts";
-import { useKeyboardShortcuts } from "@tokenring-ai/one-frontend/hooks/useKeyboardShortcuts.ts";
 import { useRemoteChangeDetection } from "@tokenring-ai/one-frontend/hooks/useRemoteChangeDetection.ts";
 import type { ViewProps } from "@tokenring-ai/one-frontend/layout/define.ts";
 import { usePanel } from "@tokenring-ai/one-frontend/layout/hooks.ts";
@@ -51,7 +50,7 @@ export function WorkflowEditorPane({ params }: ViewProps) {
   const { workflows, workflowList, agentTypes, commandList, categories, allRuns } = useEditorData();
   const { drafts, setDraft, clearDraft, clearDraftIfUnchanged } = useWorkflowDrafts();
   const { launch, launching } = useWorkflowLaunch();
-  const { openOverview, openCreate, openAgentChat } = useWorkflowLayoutNavigation();
+  const { openOverview, openCreate, openAgentChat, openRun } = useWorkflowLayoutNavigation();
   const [saving, setSaving] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
   const [cancellingRunId, setCancellingRunId] = useState<string | null>(null);
@@ -106,7 +105,10 @@ export function WorkflowEditorPane({ params }: ViewProps) {
     if (!draft || !selected) return;
     setSaving(true);
     try {
-      await workflowRPCClient.updateWorkflow({ name, workflow: normalizeDraft(draft) });
+      const { workflow: saved } = await workflowRPCClient.updateWorkflow({ name, workflow: normalizeDraft(draft) });
+      // Our own write: record its timestamp now, or the disk poller could see it before the list
+      // refresh does and report "updated on disk" for the user's own save.
+      markLoaded(saved.updatedAt);
       // Edits typed while the save was in flight stay as the new draft.
       clearDraftIfUnchanged(name, draft);
       toastManager.success(`Workflow "${name}" saved`, { duration: 3000 });
@@ -116,10 +118,7 @@ export function WorkflowEditorPane({ params }: ViewProps) {
     } finally {
       setSaving(false);
     }
-  }, [clearDraftIfUnchanged, draft, name, selected, workflows]);
-
-  // Cmd/Ctrl+S saves the editor on screen.
-  useKeyboardShortcuts([{ key: "s", allowInEditable: true, enabled: panel.isActive && isDirty, handler: () => void handleSave() }]);
+  }, [clearDraftIfUnchanged, draft, markLoaded, name, selected, workflows]);
 
   const handleDelete = useCallback(async () => {
     setDeleteTarget(null);
@@ -204,9 +203,10 @@ export function WorkflowEditorPane({ params }: ViewProps) {
         }
         onClone={handleClone}
         onDownload={() => void downloadWorkflowYaml(name)}
-        onLaunch={options => void launch(name, options)}
+        onLaunch={() => void launch(name)}
         onCancelCreate={() => {}}
         onOpenAgent={openAgentChat}
+        onOpenRun={openRun}
         onCancelRun={run => void handleCancelRun(run)}
         cancellingRunId={cancellingRunId}
       />
@@ -262,8 +262,6 @@ export function WorkflowCreatePane() {
     }
   }, [draft, finish, newName, openWorkflow, panel, workflowList, workflows]);
 
-  useKeyboardShortcuts([{ key: "s", allowInEditable: true, enabled: panel.isActive, handler: () => void handleSave() }]);
-
   const [confirmingDiscard, setConfirmingDiscard] = useState(false);
   const discardAndClose = useCallback(() => {
     setConfirmingDiscard(false);
@@ -304,6 +302,7 @@ export function WorkflowCreatePane() {
         onLaunch={() => {}}
         onCancelCreate={handleCancel}
         onOpenAgent={() => {}}
+        onOpenRun={() => {}}
         onCancelRun={() => {}}
         cancellingRunId={null}
       />

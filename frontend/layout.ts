@@ -25,12 +25,11 @@ export const WORKFLOW_APP: AppManifest = {
   path: WORKFLOW_APP_PATH,
   label: "Workflows",
   shortLabel: "WF",
-  description: "Launch and monitor automated workflows",
+  description: "Run and monitor automated workflows",
   group: "Build",
   icon: GitBranch,
   iconClass: "text-cyan-500",
   gradient: "from-cyan-500 to-teal-600",
-  defaultPinned: true,
   views: [
     WORKFLOW_LIBRARY_VIEW_ID,
     WORKFLOWS_OVERVIEW_VIEW_ID,

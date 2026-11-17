@@ -32,8 +32,8 @@ async function execute(input: z.output<typeof inputSchema>, agent: Agent): Promi
 }
 
 const description =
-  "Create a new reusable multi-step workflow. Each step is either a chat message or a structured agent command; " +
-  "a run spawns an agent of `agentType` and feeds it the steps in order. Requires the user's approval.";
+  "Create a workflow: a named, reusable multi-step script. Each step is either a chat message or a structured agent command; " +
+  "a run (workflow_run) spawns an agent of `agentType` and feeds it the steps in order. Requires the user's approval.";
 
 const inputSchema = z.object({
   name: z.string().describe("File name for the workflow: letters, numbers, hyphens and underscores, starting with a letter or number."),

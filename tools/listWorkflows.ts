@@ -16,7 +16,7 @@ async function execute(_input: z.output<typeof inputSchema>, agent: Agent): Prom
 }
 
 const description =
-  "List the saved multi-step workflows (name, display name, agent type, step count). Use workflow_get to read a workflow's steps before changing it.";
+  "List the workflows: named, saved multi-step scripts (name, display name, agent type, step count). Start one with workflow_run; use workflow_get to read a workflow's steps before changing it.";
 
 const inputSchema = z.object({});
 

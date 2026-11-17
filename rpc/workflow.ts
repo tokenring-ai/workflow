@@ -1,8 +1,12 @@
 import type TokenRingApp from "@tokenring-ai/app";
 import { createRPCEndpoint } from "@tokenring-ai/rpc/createRPCEndpoint";
 import { WorkflowState } from "../state/workflowState.ts";
-import WorkflowService from "../WorkflowService.ts";
+import WorkflowService, { type StartedRun } from "../WorkflowService.ts";
 import WorkflowRpcSchema from "./schema.ts";
+
+function startedRunResult({ runId, jobId, agent }: StartedRun) {
+  return { id: agent.id, displayName: agent.displayName, description: agent.config.description, runId, jobId };
+}
 
 export default createRPCEndpoint(WorkflowRpcSchema, {
   async listWorkflows(_args, app: TokenRingApp) {
@@ -54,15 +58,11 @@ export default createRPCEndpoint(WorkflowRpcSchema, {
   },
 
   async spawnWorkflow(args, app: TokenRingApp) {
-    const agent = await app.requireService(WorkflowService).spawnWorkflow(args.name, {
-      headless: args.headless,
-    });
+    return startedRunResult(await app.requireService(WorkflowService).spawnWorkflow(args.name));
+  },
 
-    return {
-      id: agent.id,
-      displayName: agent.displayName,
-      description: agent.config.description,
-    };
+  async rerunRun(args, app: TokenRingApp) {
+    return startedRunResult(await app.requireService(WorkflowService).rerunRun(args.runId));
   },
 
   cancelRun(args, app: TokenRingApp) {

@@ -13,9 +13,10 @@ async function execute({ args: { workflowName }, agent }: AgentCommandInputType<
   const workflow = await workflowService.getWorkflow(workflowName);
   if (!workflow) throw new CommandFailedError(`Workflow "${workflowName}" not found.`);
 
-  const spawnedAgent = await workflowService.spawnWorkflow(workflowName, { headless: agent.headless });
+  // Started from this agent: the run is a child of its job (if any), so the job limits and cancellation cascade apply.
+  const started = await workflowService.spawnWorkflow(workflowName, { startedBy: agent });
 
-  return `Spawned agent ${spawnedAgent.id} for workflow: ${workflow.displayName}`;
+  return `Started workflow ${workflow.displayName} as run ${started.runId} on agent ${started.agent.id}`;
 }
 
 export default {
@@ -24,7 +25,8 @@ export default {
   help: `Spawn a new agent and run a workflow on it.
 
 The steps run on the new agent in the background; this command returns as soon as the agent exists.
-Progress is tracked in the Workflows app.
+Progress is tracked in the Workflows app. The run is a job started by this agent: it counts toward
+the job depth and fan-out limits (agent.jobs settings), and is cancelled when the job running this agent is.
 
 ## Example
 

@@ -9,6 +9,7 @@ import createTestingApp from "@tokenring-ai/app/test/createTestingApp.test";
 import { YAML } from "bun";
 import WorkflowService from "../WorkflowService";
 import workflowListCommand from "./workflow/list.ts";
+import workflowRerunCommand from "./workflow/rerun.ts";
 import workflowSpawnCommand from "./workflow/spawn.ts";
 
 describe("workflow command", () => {
@@ -49,7 +50,7 @@ describe("workflow command", () => {
     app.addService(WorkflowService, workflowService);
 
     agent = createTestingAgent(app);
-    agent.config.headless = false;
+    agent.answerTimeoutSeconds = null;
   });
 
   afterEach(() => {
@@ -71,28 +72,16 @@ describe("workflow command", () => {
   });
 
   describe("spawn command", () => {
-    it("should spawn an agent for the workflow", async () => {
-      spyOn(workflowService, "spawnWorkflow").mockResolvedValue({ id: "spawned-agent-123" } as Agent);
+    it("starts the run from the calling agent, so it is that agent's job's child", async () => {
+      spyOn(workflowService, "spawnWorkflow").mockResolvedValue({ runId: "run-1", jobId: "job-1", agent: { id: "spawned-agent-123" } as Agent });
 
       const result = await workflowSpawnCommand.execute({
         args: { workflowName: "testWorkflow" },
         agent,
       });
 
-      expect(result).toContain("Spawned agent spawned-agent-123 for workflow: Test Workflow");
-      expect(workflowService.spawnWorkflow).toHaveBeenCalledWith("testWorkflow", { headless: false });
-    });
-
-    it("should inherit headless mode from the current agent", async () => {
-      agent.config.headless = true;
-      spyOn(workflowService, "spawnWorkflow").mockResolvedValue({ id: "spawned-agent-123" } as Agent);
-
-      await workflowSpawnCommand.execute({
-        args: { workflowName: "complexWorkflow" },
-        agent,
-      });
-
-      expect(workflowService.spawnWorkflow).toHaveBeenCalledWith("complexWorkflow", { headless: true });
+      expect(result).toContain("Started workflow Test Workflow as run run-1 on agent spawned-agent-123");
+      expect(workflowService.spawnWorkflow).toHaveBeenCalledWith("testWorkflow", { startedBy: agent });
     });
 
     it("should show error for non-existent workflow", async () => {
@@ -102,6 +91,27 @@ describe("workflow command", () => {
           agent,
         }),
       ).rejects.toThrow('Workflow "nonExistentWorkflow" not found.');
+    });
+  });
+
+  describe("rerun command", () => {
+    const finishedRun = (status: string) =>
+      ({ id: "run-9", workflowName: "testWorkflow", displayName: "Test Workflow", status }) as unknown as ReturnType<WorkflowService["getRuns"]>[number];
+
+    it("runs an interrupted run again, from the calling agent", async () => {
+      spyOn(workflowService, "getRuns").mockReturnValue([finishedRun("interrupted")]);
+      spyOn(workflowService, "rerunRun").mockResolvedValue({ runId: "run-10", jobId: "job-10", agent: { id: "agent-10" } as Agent });
+
+      const result = await workflowRerunCommand.execute({ args: { runId: "run-9" }, agent });
+
+      expect(result).toContain("again as run run-10");
+      expect(workflowService.rerunRun).toHaveBeenCalledWith("run-9", { startedBy: agent });
+    });
+
+    it("refuses a run that is still going, or unknown", async () => {
+      spyOn(workflowService, "getRuns").mockReturnValue([finishedRun("running")]);
+      await expect(workflowRerunCommand.execute({ args: { runId: "run-9" }, agent })).rejects.toThrow("still running");
+      await expect(workflowRerunCommand.execute({ args: { runId: "nope" }, agent })).rejects.toThrow('No workflow run has id "nope"');
     });
   });
 });

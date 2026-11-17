@@ -1,9 +1,9 @@
 import { toastManager } from "@tokenring-ai/one-frontend/components/ui/toast.tsx";
 import { usePaneLink } from "@tokenring-ai/one-frontend/layout/hooks.ts";
-import { workflowRPCClient } from "@tokenring-ai/one-frontend/rpc.ts";
+import { useAgentTypes, workflowRPCClient } from "@tokenring-ai/one-frontend/rpc.ts";
 import formatError from "@tokenring-ai/utility/error/formatError";
 import type { WorkflowRun } from "@tokenring-ai/workflow/schema";
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { WORKFLOW_CREATE_VIEW_ID, WORKFLOW_EDITOR_VIEW_ID, WORKFLOW_RUN_DETAIL_VIEW_ID, WORKFLOWS_OVERVIEW_VIEW_ID } from "../ids.ts";
 import { MARKETPLACE_PATH } from "./paths.ts";
@@ -37,13 +37,16 @@ export function useWorkflowLaunch() {
   const [launching, setLaunching] = useState<string | null>(null);
 
   const launch = useCallback(
-    /** `headless` runs unattended: the agent never stops to ask the user anything. */
-    async (name: string, options?: { headless?: boolean }) => {
+    /**
+     * The run is an agent job: whether its agent may stop to ask you is the job engine's call
+     * (approval escalation configured or not), so there is nothing to choose here.
+     */
+    async (name: string) => {
       setLaunching(name);
       try {
-        await workflowRPCClient.spawnWorkflow({ name, headless: options?.headless ?? false });
+        await workflowRPCClient.spawnWorkflow({ name });
         openWorkflow(name);
-        toastManager.success(`Launched "${name}" — watch the run in its panel`, { duration: 3000 });
+        toastManager.success(`Started "${name}" — watch the run in its panel`, { duration: 3000 });
       } catch (error) {
         toastManager.error(formatError(error), { duration: 5000 });
       } finally {
@@ -54,4 +57,11 @@ export function useWorkflowLaunch() {
   );
 
   return { launch, launching };
+}
+
+/** Agent type id -> display name ("leader" -> "Team Leader"); unknown ids map to themselves. */
+export function useAgentTypeLabel(): (type: string) => string {
+  const agentTypes = useAgentTypes();
+  const names = useMemo(() => new Map((agentTypes.data ?? []).map(agentType => [agentType.type, agentType.displayName])), [agentTypes.data]);
+  return useCallback((type: string) => names.get(type) || type, [names]);
 }
